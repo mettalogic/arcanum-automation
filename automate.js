@@ -370,7 +370,7 @@ function tc_lootfilter()
 function tc_sellsetup()
 {
     if (tc_gettab() != "adventure") return;
-    if (document.getElementById("#selldups")) return;
+    if (document.getElementById("selldups")) return;
 
     var sellall = document.querySelectorAll(".adventure .raid-bottom .inv div.flex-row button");
     if (sellall.length == 0) return;    // nothing to sell on tab yet
