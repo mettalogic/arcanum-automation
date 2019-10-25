@@ -131,7 +131,7 @@ function tc_maxed(resource) {
 	return !tc_resources.get(resource) || tc_resources.get(resource)[0] == tc_resources.get(resource)[1];
 }
 
-// Check if a resource is above a percentage. example: tc_check_resource("gold",.5);
+// Check if a resource is above a percentage. example: tc_check_resource("gold",.5);	// that's not a % lol
 function tc_check_resource(resource,percent) {
 	return !tc_resources.get(resource) || tc_resources.get(resource)[0] >= tc_resources.get(resource)[1] * percent;
 }
@@ -212,6 +212,29 @@ function tc_autocast()
     tc_time_offset++;
 }
 
+window.time_offset = 0;
+
+// Adds an input field to each button on the quickbar to allow casting at regular intervals
+function iko_autocast()
+{
+    // Stuff for quickslot bar
+    for (let qs of document.querySelectorAll(".quickslot")) {
+        // If it doesn't have the text entry box yet then add it.
+        if (!qs.lastElementChild.classList.contains("timeset")) {
+            var box = document.createElement("input");
+            box.setAttribute("type", "text");
+            box.setAttribute("class", "timeset");
+            box.setAttribute("style", "position:absolute;bottom:0px;left:0px;width:100%;font-weight:bold;opacity:0.75;text-align:center;");
+            qs.appendChild(box);
+        }
+
+        var val = parseInt(qs.lastElementChild.value);
+        if (val > 0 && tc_time_offset % val == 0 && qs.firstElementChild.firstElementChild !== null && qs.lastElementChild !== document.activeElement) {
+        	qs.firstElementChild.firstElementChild.click()
+        }
+    }  
+}
+
 // For AUTOING. Does several actions, MORE DOCUMENTATION
 function tc_automate()
 {
@@ -271,7 +294,7 @@ function tc_selljunk()
 		if (row.children[3].children[0].innerText == "Sell") {
 			var item = row.children[0].innerText;
 			if (sell_exact.indexOf(item) != -1 || checkmatch(item)) {
-//				console.log("Selling: " + item);
+				if (tc_debug) console.log("Selling: " + item);
 				row.children[3].children[0].click();
 			}
 		}
@@ -376,7 +399,7 @@ function tc_autoheal()
 	if (tc_spells.has("sealing light ii")){
 		if (tc_bars.get("hp")[1]-tc_bars.get("hp")[0] >= 50 && tc_bars.get("light")[1] >= 5)
 			tc_cast_spell("sealing light ii");
-	}else if (tc_spells.has("sealing light")){
+	} else if (tc_spells.has("sealing light")){
 		if (tc_bars.get("hp")[1]-tc_bars.get("hp")[0] >= 15 && tc_bars.get("light")[1] >= 5)
 			tc_cast_spell("sealing light");
 	}
@@ -394,7 +417,10 @@ var tc_timer_ac = window.setInterval(function(){
 }, tc_auto_speed);
 
 // Can't guarantee that timer will work exactly every second, so reduce interval here to compensate so spells don't run out
-var tc_timer_autocase  = window.setInterval(tc_autocast, tc_auto_speed_spells);
+var tc_timer_autocase = window.setInterval(function() {
+	iko_autocast();
+	tc_autocast();
+}, tc_auto_speed_spells);
 
 // timer to populate the maps of spells, resources, and actions
 var tc_timer_populate = window.setInterval(function(){
