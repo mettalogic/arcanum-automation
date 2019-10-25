@@ -233,7 +233,7 @@ function iko_autocast()
     }  
 }
 
-// For AUTOING. Does several actions, MORE DOCUMENTATION
+// For AUTOING. Does several actions, MORE DOCUMENTATION (the code is the documentation ...)
 function tc_automate()
 {
     if (tc_suspend) return;
@@ -266,6 +266,7 @@ function tc_automate()
                 tc_click_action(tc_gems[gem]);
             }
         }
+		// could also buy the gem box here
     }
 
     // Sublimate lore
@@ -281,7 +282,7 @@ function tc_automate()
 function tc_selljunk()
 {
 	var sell_exact = [ "amulet", "band", "belt", "boots", "broomstick", "cane", "cap", "cape", "cincture", "cloak", "club", "collar", "conical helm", "dagger", "girdle", "gloves", "greaves", "hat", "jerkin", "knife", "loop", "necklace", "pendant", "ring", "robe", "sash", "shortsword", "spear", "staff" ];
-	var sell_match = [ "silk ", "cotton ", "stone ", "leather ", "^wood ", "bone ", "bronze ", "iron ", "^steel " ];
+	var sell_match = [ "silk ", "cotton ", "stone ", "leather ", "^wood ", "bone ", "bronze ", "iron ", "^steel " ];	// aggressive
 
 		// "silk ", "cotton ", "stone ", "leather ", "^wood ", "bone ", "bronze ", "iron ", "^steel ", "quicksteel ", "mithril ", "ebonwood ", "ethereal ", "adamant "
 
@@ -338,7 +339,7 @@ function tc_selldups()
 			}
 		}
 		if (qty > maxqty) {
-//			console.log("Selling: " + item);
+			if (tc_debug) console.log("Selling: " + item);
 			row.children[3].children[0].click();
 			items.set(item, qty-1);
 		}
@@ -447,7 +448,7 @@ var tc_timer_ac = window.setInterval(function(){
 }, tc_auto_speed);
 
 // Can't guarantee that timer will work exactly every second, so reduce interval here to compensate so spells don't run out
-var tc_timer_autocase = window.setInterval(function() {
+var tc_timer_autocast = window.setInterval(function() {
 	iko_autocast();
 	tc_autocast();
 }, tc_auto_speed_spells);
