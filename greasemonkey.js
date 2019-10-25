@@ -98,8 +98,8 @@ function tc_populate_bars()
 	for (let n of document.querySelectorAll("div.game-main div.vitals table.bars tr")) {
 			var name = n.firstElementChild.innerHTML.toLowerCase();
 			var vals = n.querySelectorAll("span.bar-text")[0].innerText.split("/");
-			var val0 = parseInt(vals[0]);
-			var val1 = parseInt(vals[1]);
+			var val0 = parseFloat(vals[0]);
+			var val1 = parseFloat(vals[1]);
 			tc_bars.set(name, [ val0, val1 ]);
 	}
 }
@@ -211,8 +211,6 @@ function tc_autocast()
     }
     tc_time_offset++;
 }
-
-window.time_offset = 0;
 
 // Adds an input field to each button on the quickbar to allow casting at regular intervals
 function iko_autocast()
