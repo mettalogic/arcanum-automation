@@ -347,30 +347,62 @@ function tc_selldups()
 	}
 }
 
-// Create junk and dupe sell buttons if not already present
-function tc_sellsetup()
+function tc_lootfilter()
 {
-	if (tc_gettab() != "adventure") return;
-	if (document.querySelectorAll("#selldups").length > 0) return;
-
-	var sellall = document.querySelectorAll(".adventure .raid-bottom .inv div.flex-row button")[0];
-	if(!sellall) return;
-	var selljunk = document.createElement("button");
-	var t1 = document.createTextNode("Sell Junk");
-	selljunk.appendChild(t1);
-	selljunk.addEventListener("click", tc_selljunk);
-
-	var selldups = document.createElement("button");
-	var t2 = document.createTextNode("Sell Dupes");
-	selldups.appendChild(t2);
-	selldups.addEventListener("click", tc_selldups);
-	selldups.id = "selldups";
-
-	sellall.parentNode.insertBefore(selljunk, null);
-	sellall.parentNode.insertBefore(selldups, null);
-	console.log("buttons added");
+	var input = document.getElementById("lootfilter");
+	if (!input) return;
+	var filter = input.value;
+	if (tc_debug) console.log("filter: " + filter);
+	
+	if (filter.length == 0) {
+		// Clear all hidden
+		for (let row of document.querySelectorAll(".adventure .raid-bottom .inv table tr"))
+			row.style.display = "";
+	}
+	else {
+		for (let row of document.querySelectorAll(".adventure .raid-bottom .inv table tr"))
+			if (row.children[0].innerText.indexOf(filter) != -1)
+				row.style.display = "";
+			else
+				row.style.display = "none";
+	}
 }
 
+// Create junk and dupe sell buttons and a loot filter if not already present
+function tc_sellsetup()
+{
+    if (tc_gettab() != "adventure") return;
+    if (document.getElementById("#selldups")) return;
+
+    var sellall = document.querySelectorAll(".adventure .raid-bottom .inv div.flex-row button");
+    if (sellall.length == 0) return;    // nothing to sell on tab yet
+    sellall = sellall[0];
+
+    var selljunk = document.createElement("button");
+    var t1 = document.createTextNode("Sell Junk");
+    selljunk.appendChild(t1);
+    selljunk.addEventListener("click", tc_selljunk);
+
+    var selldups = document.createElement("button");
+    var t2 = document.createTextNode("Sell Dupes");
+    selldups.appendChild(t2);
+    selldups.addEventListener("click", tc_selldups);
+    selldups.id = "selldups";
+    
+    var br = document.createElement("br");
+    var t3 = document.createTextNode("Filter");
+    var filter = document.createElement("Input");
+    filter.addEventListener("keyup", tc_lootfilter);
+    filter.id = "lootfilter";
+    filter.width = "50";
+
+    sellall.parentNode.insertBefore(selljunk, null);
+    sellall.parentNode.insertBefore(selldups, null);
+    sellall.parentNode.insertBefore(br, null);
+    sellall.parentNode.insertBefore(t3, null);
+    sellall.parentNode.insertBefore(filter, null);
+    if (tc_debug) console.log("Sell buttons added");
+}
 
 // Uses focus until you have only 10 mana left.
 function tc_autofocus()
