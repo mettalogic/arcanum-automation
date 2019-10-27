@@ -8,7 +8,7 @@ http://www.lerpinglemur.com/arcanum/
 
 Tasks automated include:
 - Making/purchasing scrolls, codices, gems when gold/research is full
-- lling herbs when full
+- Selling herbs when full
 - Regularly casting spell buffs which have been learnt
 - Adding an option on the quickbar to specify a time - buttons will be clicked every time interval
 - Adding a filter function and additional sell buttons for equipment while adventuring
