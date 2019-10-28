@@ -1,7 +1,7 @@
 # arcanum-automation
 Automation script for Arcanum web game
 
-The Greasemonkey script automate.user.js automates various tasks in the Arcanum web browser game available from Kongregate (where it's called "Theory of Magic"):
+The Greasemonkey/Tampermonkey script automate.user.js automates various tasks in the Arcanum web browser game available from Kongregate (where it's called "Theory of Magic"):
 https://www.kongregate.com/games/lerpinglemur/theory-of-magic
 and from the author's web site:
 http://www.lerpinglemur.com/arcanum/
