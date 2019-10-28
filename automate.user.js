@@ -278,7 +278,6 @@ function tc_autocast()
 			tc_cast_spell(spell);
 		}
 	}
-	tc_time_offset++;
 }
 
 // For AUTOING. Does several actions
@@ -515,6 +514,7 @@ var tc_timer_ac = window.setInterval(function(){
 var tc_timer_autocast = window.setInterval(function() {
 	iko_autocast();
 	tc_autocast();
+	tc_time_offset++;
 }, tc_auto_speed_spells);
 
 // timer is multipled by 50 to allow a small break if you were forced to leave adeventure before completion
