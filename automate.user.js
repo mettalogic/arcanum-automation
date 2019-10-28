@@ -1,11 +1,13 @@
 // ==UserScript==
 // @name         aardvark arcanum auto
-// @version      0.4
+// @version      0.41
 // @author       aardvark
 // @description  Automates casting buffs, buying gems making types gems, making lore. Adds sell junk/dupe item buttons. Must open the main tab and the spells tab once to work.
 // @match        http://www.lerpinglemur.com/arcanum/
 // @match        https://game312933.konggames.com/gamez/0031/2933/*
 // ==/UserScript==
+
+// Set up for tier 2 classes and above. If you are starting out it is recomended you disable tc_auto_misc and tc_auto_adventure.
 
 var tc_debug = false;	// set to true to see debug messages
 
@@ -17,6 +19,30 @@ var tc_auto_cast = true;
 var tc_auto_focus = true;
 var tc_auto_heal = true;
 
+// Set to a adventure name to continously ruin that adventure, leave blank to disable
+var tc_auto_adventure = "none";
+
+/* The following can be increased by encounters in the adventure listed. 
+(Stat) - ("dungeon name") (increased amount) (chance to get the encounter needed)
+
+Skills:
+Anatomy - "ruined crypt" 0.01 2/7
+Spirit Lore - "hestia's cottage" 0.001 1/6, "explore treffil wood" 0.001 1/6
+Charms - "hestia's cottage" 0.01 1/6
+Enchanting - "hestia's cottage" 0.01 1/6
+Potions - "hestia's cottage" 0.01 1/6
+Scrying - "hestia's cottage" 0.001 1/6
+History - "hestia's cottage" 0.001 1/6, "genezereth" 0.001 1/7
+Crafting - "fazbit's workshop" 0.001 1/7
+Pyromancy - "fazbit's workshop" 0.001 1/7
+Alchemy - "fazbit's workshop" 0.001 2/7 
+Minerology - "genezereth" 0.001 1/7
+Air Lore - "genezereth" 0.001 1/7
+
+Stats:
+Arcana - "pidwig's cove" 0.05 1/6
+*/
+
 var tc_auto_speed = 200; // Speed in ms, going to low will cause performance issues.
 var tc_auto_speed_spells = 950;	// interval in ms for spell casting. should be 1000, but lag can cause spells to run out
 
@@ -24,6 +50,7 @@ var tc_spells = new Map();
 var tc_resources = new Map();
 var tc_actions = new Map();
 var tc_bars = new Map();
+var tc_locales = new Map();
 var tc_focus;
 
 var tc_time_offset = 0;
@@ -81,7 +108,7 @@ function tc_populate_spells()
 	}
 }
 
-// Call this every second - automatically grabs resource values
+// Call this every second to update resource values
 function tc_populate_resources()
 {
 	for (let n of document.querySelectorAll("div.game-main div.resource-list tr.item-name:not(.locked)")) {
@@ -93,6 +120,7 @@ function tc_populate_resources()
 	}
 }
 
+// Call every second to update mana bars
 function tc_populate_bars()
 {
 	for (let n of document.querySelectorAll("div.game-main div.vitals table.bars tr")) {
@@ -118,17 +146,19 @@ function tc_populate_actions()
 	}
 }
 
-// Create a gem of a certian type. NOT USED
-function tc_create_gem(gem)
+// Call every second to look for new adventures and adventures that are now active.
+function tc_populate_locales()
 {
-	var action = tc_gems.get(gem);
-	if (!action) return false;
-	return tc_click_action(action);
-}
-
-// Checks if a given resource is at it's max value. FAZING OUT
-function tc_maxed(resource) {
-	return !tc_resources.get(resource) || tc_resources.get(resource)[0] == tc_resources.get(resource)[1];
+	if (tc_gettab() !== "adventure") return;
+	
+	//Map is set up as: name, [progress, needed, button]
+	for (let qs of document.querySelectorAll("div.game-main div.locales div.dungeon")){
+		if(!qs.children[0].children[0].children[1].disabled){
+			var name = qs.children[0].children[0].children[0].innerText // name of dungeon
+			var vals = qs.children[1].innerText.split("/")
+			tc_locales.set(name,[vals[0],vals[1],qs.children[0].children[0].children[1]]);
+		}
+	}
 }
 
 // Check if a resource is above a percentage. example: tc_check_resource("gold",.5);	// that's not a % lol
@@ -160,6 +190,24 @@ function tc_settab(newtab)
 			return;
 		}
 	}
+}
+
+// Clicks the locale button
+function tc_click_locale(locale)
+{
+	console.log("click_locale");
+	var lcl = tc_locales.get(locale);
+	if (!lcl) return false;
+	
+	if (lcl.disabled) {
+		if (tc_debug) console.log("Locale '" + locale + "' was disabled - deleting it");
+		tc_locales.delete(locale);
+		return false;
+	}
+	
+	if(tc_debug) console.log("Clicking: " + locale);
+	lcl[2].click();
+	return true;
 }
 
 // Clicks the action button
@@ -196,23 +244,7 @@ function tc_cast_spell(spell)
 	return true;
 }
 
-// For AUTOING. Casts spells listed under autospells
-function tc_autocast()
-{
-	if (tc_suspend) return;
-	if (!tc_auto_cast) return;
-
-	for (var spell in tc_autospells) {
-		var rpt = tc_autospells[spell];
-		if (tc_time_offset % rpt == 0) {
-			if (tc_debug) console.log("try casting " + spell);
-			tc_cast_spell(spell);
-		}
-	}
-	tc_time_offset++;
-}
-
-// Adds an input field to each button on the quickbar to allow casting at regular intervals
+// Adds an input field to each button on the quickbar to allow casting at regular intervals. Author: iko
 function iko_autocast()
 {
 	// Stuff for quickslot bar
@@ -233,7 +265,23 @@ function iko_autocast()
 	}
 }
 
-// For AUTOING. Does several actions, MORE DOCUMENTATION (the code is the documentation ...)
+// For AUTOING. Casts spells listed under autospells
+function tc_autocast()
+{
+	if (tc_suspend) return;
+	if (!tc_auto_cast) return;
+
+	for (var spell in tc_autospells) {
+		var rpt = tc_autospells[spell];
+		if (tc_time_offset % rpt == 0) {
+			if (tc_debug) console.log("try casting " + spell);
+			tc_cast_spell(spell);
+		}
+	}
+	tc_time_offset++;
+}
+
+// For AUTOING. Does several actions
 function tc_automate()
 {
 	if (tc_suspend) return;
@@ -346,6 +394,7 @@ function tc_selldups()
 	}
 }
 
+// Adds a filter input for loot gained from adventures.
 function tc_lootfilter()
 {
 	var input = document.getElementById("lootfilter");
@@ -423,9 +472,17 @@ function tc_autofocus()
 	}
 }
 
+// Autoheal based on avalibility of spells and need.
 function tc_autoheal()
 {
+	if (tc_suspend) return;
 	if (!tc_auto_heal) return;
+
+	if (tc_spells.has("sealing light iii")) {
+		if (tc_bars.get("hp")[1]-tc_bars.get("hp")[0] >= 100 && tc_bars.get("light")[1] >= 7)
+			tc_cast_spell("sealing light iii")
+		return;
+	}
 
 	if (tc_spells.has("sealing light ii")){
 		if (tc_bars.get("hp")[1]-tc_bars.get("hp")[0] >= 50 && tc_bars.get("light")[1] >= 5)
@@ -441,10 +498,17 @@ function tc_autoheal()
 	Basic Automation Stuff
 */
 
+// Main timer for most functions
 var tc_timer_ac = window.setInterval(function(){
+	tc_populate_spells();
+	tc_populate_resources();
+	tc_populate_actions();
+	tc_populate_bars();
+	tc_populate_locales();
 	tc_automate();
 	tc_autofocus();
 	tc_autoheal();
+	tc_sellsetup();
 }, tc_auto_speed);
 
 // Can't guarantee that timer will work exactly every second, so reduce interval here to compensate so spells don't run out
@@ -453,12 +517,7 @@ var tc_timer_autocast = window.setInterval(function() {
 	tc_autocast();
 }, tc_auto_speed_spells);
 
-// timer to populate the maps of spells, resources, and actions
-var tc_timer_populate = window.setInterval(function(){
-	tc_populate_spells();
-	tc_populate_resources();
-	tc_populate_actions();
-	tc_populate_bars();
-}, tc_auto_speed);
-
-var tc_timer_as = window.setInterval(tc_sellsetup, tc_auto_speed);
+// timer is multipled by 50 to allow a small break if you were forced to leave adeventure before completion
+var tc_timer_autoadv  = window.setInterval(function(){
+	tc_click_locale(tc_auto_adventure);
+}, (tc_auto_speed*50));
