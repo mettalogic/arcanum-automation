@@ -15,3 +15,10 @@ Tasks automated include:
 - Actively clicking focus while learning a skill
   
 Note: the script requires you to visit the "Spells" option to learn new spells.
+
+
+The Browser sub-directory contains a JSON browser written in C++ using the QT toolkit. It's only been tested on Linux, but should be cross-platform. On startup it will ask for a directory containing the Arcanum JSON files, it will read "*.json" in that directory. There are several tabs in the GUI, some of which were added to help create content on the wiki, but the most useful two are:
+ - the Tree view which compacts each "item" (e.g. each spell, effect, home etc.) in the json file into a single row, making it easy to compare items. Click on headers to sort columns.
+ - The Search Results - type a string into the Search field and press RETURN, and it will search for that string across all the JSON files.
+ 
+ Note that the file "seasonal.json" is mostly ignored currently as it has a slightly different layout.
