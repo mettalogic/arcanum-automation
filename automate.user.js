@@ -1,10 +1,12 @@
 // ==UserScript==
 // @name         aardvark arcanum auto
-// @version      0.41
+// @version      0.43
 // @author       aardvark
 // @description  Automates casting buffs, buying gems making types gems, making lore. Adds sell junk/dupe item buttons. Must open the main tab and the spells tab once to work.
+// @downloadURL  	https://github.com/mettalogic/arcanum-automation/raw/master/automate.user.js
 // @match        http://www.lerpinglemur.com/arcanum/
 // @match        https://game312933.konggames.com/gamez/0031/2933/*
+// @run-at 				document-idle
 // ==/UserScript==
 
 // Set up for tier 2 classes and above. If you are starting out it is recomended you disable tc_auto_misc and tc_auto_adventure.
@@ -20,9 +22,9 @@ var tc_auto_focus = true;
 var tc_auto_heal = true;
 
 // Set to a adventure name to continously ruin that adventure, leave blank to disable
-var tc_auto_adventure = "none";
+var tc_auto_adventure = "";
 
-/* The following can be increased by encounters in the adventure listed. 
+/* The following can be increased by encounters in the adventure listed.
 (Stat) - ("dungeon name") (increased amount) (chance to get the encounter needed)
 
 Skills:
@@ -35,7 +37,7 @@ Scrying - "hestia's cottage" 0.001 1/6
 History - "hestia's cottage" 0.001 1/6, "genezereth" 0.001 1/7
 Crafting - "fazbit's workshop" 0.001 1/7
 Pyromancy - "fazbit's workshop" 0.001 1/7
-Alchemy - "fazbit's workshop" 0.001 2/7 
+Alchemy - "fazbit's workshop" 0.001 2/7
 Minerology - "genezereth" 0.001 1/7
 Air Lore - "genezereth" 0.001 1/7
 
@@ -50,7 +52,7 @@ var tc_spells = new Map();
 var tc_resources = new Map();
 var tc_actions = new Map();
 var tc_bars = new Map();
-var tc_locales = new Map();
+var tc_adventures = new Map();
 var tc_focus;
 
 var tc_time_offset = 0;
@@ -147,7 +149,7 @@ function tc_populate_actions()
 }
 
 // Call every second to look for new adventures and adventures that are now active.
-function tc_populate_locales()
+function tc_populate_adventures()
 {
 	if (tc_gettab() !== "adventure") return;
 	
@@ -156,7 +158,7 @@ function tc_populate_locales()
 		if(!qs.children[0].children[0].children[1].disabled){
 			var name = qs.children[0].children[0].children[0].innerText // name of dungeon
 			var vals = qs.children[1].innerText.split("/")
-			tc_locales.set(name,[vals[0],vals[1],qs.children[0].children[0].children[1]]);
+			tc_adventures.set(name,[vals[0],vals[1],qs.children[0].children[0].children[1]]);
 		}
 	}
 }
@@ -192,22 +194,22 @@ function tc_settab(newtab)
 	}
 }
 
-// Clicks the locale button
-function tc_click_locale(locale)
+// Clicks the selected adventure button
+function tc_click_adv(adventure)
 {
-	console.log("click_locale");
-	var lcl = tc_locales.get(locale);
-	if (!lcl) return false;
-	
+	var lcl = tc_adventures.get(adventure);
+	if (!lcl) return;
+	if (tc_suspend) return;
+
 	if (lcl.disabled) {
-		if (tc_debug) console.log("Locale '" + locale + "' was disabled - deleting it");
-		tc_locales.delete(locale);
-		return false;
+		if (tc_debug) console.log("Adventure '" + adventure + "' was disabled - deleting it");
+		tc_adventures.delete(adventure);
+		return;
 	}
-	
-	if(tc_debug) console.log("Clicking: " + locale);
+
+	if(tc_debug) console.log("Clicking: " + adventure);
 	lcl[2].click();
-	return true;
+	return;
 }
 
 // Clicks the action button
@@ -278,6 +280,7 @@ function tc_autocast()
 			tc_cast_spell(spell);
 		}
 	}
+	tc_time_offset++;
 }
 
 // For AUTOING. Does several actions
@@ -324,6 +327,19 @@ function tc_automate()
 					qs.children[3].firstElementChild.click();
 	}
 }
+
+// For AUTOING. Runs an adventure again after you have finished it.
+function tc_autoadv(){
+	
+	if (tc_suspend) return;
+	var lcl = tc_adventures.get(tc_auto_adventure);
+	if(!lcl) return;
+
+	var advper = lcl[0]/lcl[1];
+	if (advper == 0 || advper == 1) tc_click_adv(tc_auto_adventure); // this might just need to be advper==1
+	
+}
+
 
 // Sells all items that are considered junk
 function tc_selljunk()
@@ -451,6 +467,31 @@ function tc_sellsetup()
 	if (tc_debug) console.log("Sell buttons added");
 }
 
+// Puts a button to set which dungeon to auto and pressing flee will cancle. Code based off of code by Bz
+function tc_advsetup()
+{
+	if (tc_gettab() !== "adventure") return;
+	if (tc_suspend) return;
+	// makes clicking flee disable the auto adventure
+	if (document.querySelector("div.game-main div.adventure div.explore .raid-btn"))
+	{
+		document.querySelector("div.game-main div.adventure div.explore .raid-btn").addEventListener("click", function(){tc_auto_adventure = "";})
+	}
+	
+	// Creates an auto button for every adventure.
+	for (let qs of document.querySelectorAll("div.game-mid div.adventure div.locales div.dungeon span.separate:first-child")){
+		if (qs.lastElementChild.innerText !== "Auto"){
+			var seldungeon = document.createElement("button");
+			seldungeon.appendChild(document.createTextNode("Auto"));
+			seldungeon.addEventListener("click", function(){
+				tc_auto_adventure = qs.firstElementChild.firstElementChild.innerText;
+				tc_click_adv(tc_auto_adventure)});
+			qs.appendChild(seldungeon);
+		}
+	}
+}
+
+
 // Uses focus until you have only 10 mana left.
 function tc_autofocus()
 {
@@ -503,21 +544,17 @@ var tc_timer_ac = window.setInterval(function(){
 	tc_populate_resources();
 	tc_populate_actions();
 	tc_populate_bars();
-	tc_populate_locales();
+	tc_populate_adventures();
 	tc_automate();
 	tc_autofocus();
 	tc_autoheal();
+	tc_autoadv();
 	tc_sellsetup();
+	tc_advsetup();
 }, tc_auto_speed);
 
 // Can't guarantee that timer will work exactly every second, so reduce interval here to compensate so spells don't run out
 var tc_timer_autocast = window.setInterval(function() {
 	iko_autocast();
 	tc_autocast();
-	tc_time_offset++;
 }, tc_auto_speed_spells);
-
-// timer is multipled by 50 to allow a small break if you were forced to leave adeventure before completion
-var tc_timer_autoadv  = window.setInterval(function(){
-	tc_click_locale(tc_auto_adventure);
-}, (tc_auto_speed*50));
