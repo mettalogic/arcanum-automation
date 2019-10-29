@@ -1,15 +1,13 @@
 // ==UserScript==
 // @name         aardvark arcanum auto
-// @version      0.43
+// @version      0.5
 // @author       aardvark
 // @description  Automates casting buffs, buying gems making types gems, making lore. Adds sell junk/dupe item buttons. Must open the main tab and the spells tab once to work.
-// @downloadURL  	https://github.com/mettalogic/arcanum-automation/raw/master/automate.user.js
+// @downloadURL  https://github.com/mettalogic/arcanum-automation/raw/master/automate.user.js
 // @match        http://www.lerpinglemur.com/arcanum/
 // @match        https://game312933.konggames.com/gamez/0031/2933/*
-// @run-at 				document-idle
+// @run-at       document-idle
 // ==/UserScript==
-
-// Set up for tier 2 classes and above. If you are starting out it is recomended you disable tc_auto_misc and tc_auto_adventure.
 
 var tc_debug = false;	// set to true to see debug messages
 
@@ -45,7 +43,7 @@ Stats:
 Arcana - "pidwig's cove" 0.05 1/6
 */
 
-var tc_auto_speed = 200; // Speed in ms, going to low will cause performance issues.
+var tc_auto_speed = 1000; // Speed in ms, going too low will cause performance issues.
 var tc_auto_speed_spells = 950;	// interval in ms for spell casting. should be 1000, but lag can cause spells to run out
 
 var tc_spells = new Map();
@@ -152,7 +150,7 @@ function tc_populate_actions()
 function tc_populate_adventures()
 {
 	if (tc_gettab() !== "adventure") return;
-	
+
 	//Map is set up as: name, [progress, needed, button]
 	for (let qs of document.querySelectorAll("div.game-main div.locales div.dungeon")){
 		if(!qs.children[0].children[0].children[1].disabled){
@@ -207,7 +205,7 @@ function tc_click_adv(adventure)
 		return;
 	}
 
-	if(tc_debug) console.log("Clicking: " + adventure);
+	if (tc_debug) console.log("Clicking: " + adventure);
 	lcl[2].click();
 	return;
 }
@@ -280,7 +278,6 @@ function tc_autocast()
 			tc_cast_spell(spell);
 		}
 	}
-	tc_time_offset++;
 }
 
 // For AUTOING. Does several actions
@@ -329,17 +326,16 @@ function tc_automate()
 }
 
 // For AUTOING. Runs an adventure again after you have finished it.
-function tc_autoadv(){
-	
+function tc_autoadv()
+{
 	if (tc_suspend) return;
 	var lcl = tc_adventures.get(tc_auto_adventure);
-	if(!lcl) return;
+	if (!lcl) return;
 
 	var advper = lcl[0]/lcl[1];
 	if (advper == 0 || advper == 1) tc_click_adv(tc_auto_adventure); // this might just need to be advper==1
-	
-}
 
+}
 
 // Sells all items that are considered junk
 function tc_selljunk()
@@ -477,7 +473,7 @@ function tc_advsetup()
 	{
 		document.querySelector("div.game-main div.adventure div.explore .raid-btn").addEventListener("click", function(){tc_auto_adventure = "";})
 	}
-	
+
 	// Creates an auto button for every adventure.
 	for (let qs of document.querySelectorAll("div.game-mid div.adventure div.locales div.dungeon span.separate:first-child")){
 		if (qs.lastElementChild.innerText !== "Auto"){
@@ -491,11 +487,12 @@ function tc_advsetup()
 	}
 }
 
-
 // Uses focus until you have only 10 mana left.
 function tc_autofocus()
 {
+	if (tc_suspend) return;
 	if (!tc_auto_focus) return;
+
 	if (!tc_focus)
 	for (let qs of document.querySelectorAll(".vitals div.separate button.btn-sm")) {
 		if (!tc_focus && qs.innerHTML === "Focus")
@@ -533,28 +530,181 @@ function tc_autoheal()
 	}
 }
 
+// Functions to load and save settings from local storage and display configuration dialog.
+
+function tc_load_settings()
+{
+	// All data stored in localStorage is of type string - need to convert it back.
+	// Also allow default values for first time running script.
+	function get_val(name, default_val, type) {
+		var val = localStorage.getItem(name);
+		if (val === null) return default_val;
+		if (type === "bool") return val === "true";
+		if (type === "int") return parseInt(val);
+		return val;
+	}
+
+	// Set default values here to be "noob-friendly"
+	tc_suspend = get_val("tc_suspend", false, "bool");
+	tc_auto_cast = get_val("tc_auto_cast", true, "bool");
+	tc_auto_focus = get_val("tc_auto_focus", true, "bool");
+	tc_auto_heal = get_val("tc_auto_heal", true, "bool");
+	tc_auto_misc = get_val("tc_auto_misc", true, "bool");
+	tc_auto_speed = get_val("tc_auto_speed", 1000, "int");
+	tc_auto_speed_spells = get_val("tc_auto_speed_spells", 950, "int");
+	tc_debug = get_val("tc_debug", false, "bool");
+
+	document.getElementById("tc_suspend").checked = !tc_suspend;	// this one's backwards
+	document.getElementById("tc_auto_cast").checked = tc_auto_cast;
+	document.getElementById("tc_auto_focus").checked = tc_auto_focus;
+	document.getElementById("tc_auto_heal").checked = tc_auto_heal;
+	document.getElementById("tc_auto_misc").checked = tc_auto_misc;
+	document.getElementById("tc_auto_speed").value = tc_auto_speed;
+	document.getElementById("tc_auto_speed_spells").value = tc_auto_speed_spells;
+	document.getElementById("tc_debug").checked = tc_debug;
+}
+
+function tc_save_settings()
+{
+	tc_suspend = !document.getElementById("tc_suspend").checked;	// this one's backwards
+	tc_auto_cast = document.getElementById("tc_auto_cast").checked;
+	tc_auto_focus = document.getElementById("tc_auto_focus").checked;
+	tc_auto_heal = document.getElementById("tc_auto_heal").checked;
+	tc_auto_misc = document.getElementById("tc_auto_misc").checked;
+	tc_auto_speed = parseInt(document.getElementById("tc_auto_speed").value);
+	tc_auto_speed_spells = parseInt(document.getElementById("tc_auto_speed_spells").value);
+	tc_debug = document.getElementById("tc_debug");
+
+	localStorage.setItem("tc_suspend", tc_suspend);
+	localStorage.setItem("tc_auto_cast", tc_auto_cast);
+	localStorage.setItem("tc_auto_focus", tc_auto_focus);
+	localStorage.setItem("tc_auto_heal", tc_auto_heal);
+	localStorage.setItem("tc_auto_misc", tc_auto_misc);
+	localStorage.setItem("tc_auto_speed", tc_auto_speed);
+	localStorage.setItem("tc_auto_speed_spells", tc_auto_speed_spells);
+	localStorage.setItem("tc_debug", tc_debug);
+
+	// Now need to restart timers with new values
+	start_timers();
+}
+
+function tc_close_config_cancel()
+{
+	var config = document.getElementById("config_options");
+	if (!config) return;
+
+	config.style.display = "none";
+	if (tc_debug) console.log("config close (cancel) clicked");
+}
+
+function tc_close_config_save()
+{
+	var config = document.getElementById("config_options");
+	if (!config) return;
+
+	tc_save_settings();
+	config.style.display = "none";
+	if (tc_debug) console.log("config close (save) clicked");
+}
+
+function tc_show_config()
+{
+	var config = document.getElementById("config_options");
+	if (!config) return;
+
+	tc_load_settings();
+	config.style.display = "block";
+	if (tc_debug) console.log("config clicked");
+}
+
+function tc_config_setup()
+{
+	if (document.getElementById("automate_config")) return;
+
+	// Try to add the config button to the quickslot bar, but if the user hasn't created any shortcuts yet fall back to quickbar
+	var config = document.querySelectorAll(".quickslot");
+	if (config.length == 0) {
+		config = document.querySelectorAll(".quickbar");
+		if (config.length == 0) return;	// nothing to add it to
+	}
+	config = config[0];
+
+	var configbtn = document.createElement("button");
+	var t1 = document.createTextNode("Configure Automation");
+	configbtn.appendChild(t1);
+	configbtn.id = "automate_config";
+	configbtn.style = "margin-left: auto";	// align right in flexbox
+	configbtn.addEventListener("click", tc_show_config);
+
+	var dummy = document.createElement('div');	// this div won't be included, only the HTML below
+	// Need to specify a background color or the dialog will be transparent. Dark mode?
+	// Looks ugly, but will do for now.
+	// Add auto adventuring?
+	// Add equipment considered junk
+	var html = `
+<div id="config_options" class="settings popup" style="display:none; background-color:#eee; max-width:800px; position: absolute; bottom:15px; right: 15px; top: auto; left: auto;">
+<input type="checkbox" name="tc_suspend" id="tc_suspend" title="If unchecked, all automation is suspended. If checked depends on items enabled below."> enable automation of items below<br><br>
+<input type="checkbox" name="tc_auto_misc" id="tc_auto_misc"> buy gems, sell herbs, scribe scrolls etc.<br>
+<input type="checkbox" name="tc_auto_focus" id="tc_auto_focus"> click focus while learning skills<br>
+<input type="checkbox" name="tc_auto_cast" id="tc_auto_cast" title="e.g. mana, fount"> cast common buff spells<br>
+<input type="checkbox" name="tc_auto_heal" id="tc_auto_heal"> cast healing spells in combat<br>
+<hr>
+<input type="text" name="tc_auto_speed" id="tc_auto_speed" width=10> interval (ms) to run automation functions<br>
+<input type="text" name="tc_auto_speed_spells" id="tc_auto_speed_spells" width=10 title="Should be 1000 but reduce it if lag is causing spell buffs to expire"> interval (ms) for spellcast functions<br>
+<hr>
+<input type="checkbox" name="tc_debug" id="tc_debug"> send debug info to console<br>
+<hr>
+<button type="button" onclick="tc_close_config_cancel()">Cancel</button>
+<button type="button" onclick="tc_close_config_save()">Save</button>
+</div> `;
+	dummy.innerHTML = html;
+	document.body.firstElementChild.appendChild(dummy);
+
+	config.parentNode.insertBefore(configbtn, null);
+	if (tc_debug) console.log("Config button added");
+}
+
 
 /*
 	Basic Automation Stuff
 */
 
-// Main timer for most functions
-var tc_timer_ac = window.setInterval(function(){
-	tc_populate_spells();
-	tc_populate_resources();
-	tc_populate_actions();
-	tc_populate_bars();
-	tc_populate_adventures();
-	tc_automate();
-	tc_autofocus();
-	tc_autoheal();
-	tc_autoadv();
-	tc_sellsetup();
-	tc_advsetup();
-}, tc_auto_speed);
+// Do this before we start any timers - loads timer values etc. from local storage.
+tc_config_setup();
+tc_load_settings();
 
-// Can't guarantee that timer will work exactly every second, so reduce interval here to compensate so spells don't run out
-var tc_timer_autocast = window.setInterval(function() {
-	iko_autocast();
-	tc_autocast();
-}, tc_auto_speed_spells);
+// Main timer for most functions
+var tc_timer_ac;
+// Timer for spells.
+// Can't guarantee that timer will work exactly every second, so can reduce interval to compensate so spells don't run out
+var tc_timer_autocast;
+
+function start_timers()	// can be restarted by save_settings()
+{
+	if (tc_timer_ac != undefined)
+		window.clearInterval(tc_timer_ac);
+	if (tc_timer_autocast != undefined)
+		window.clearInterval(tc_timer_autocast);
+
+	tc_timer_ac = window.setInterval(function() {
+		tc_populate_spells();
+		tc_populate_resources();
+		tc_populate_actions();
+		tc_populate_bars();
+		tc_populate_adventures();
+		tc_automate();
+		tc_autofocus();
+		tc_autoheal();
+		tc_autoadv();
+		tc_sellsetup();
+		tc_advsetup();
+	}, tc_auto_speed);
+
+	tc_timer_autocast = window.setInterval(function() {
+		iko_autocast();
+		tc_autocast();
+		tc_time_offset++;	// must be done here so it works even if tc_autocast disabled
+	}, tc_auto_speed_spells);
+}
+
+start_timers();
