@@ -296,7 +296,11 @@ function tc_automate()
 		tc_click_action("scribe scroll");
 	if (!tc_check_resource("codices",1) && tc_check_resource("scrolls",1) && tc_check_bars("mana",.5))
 		tc_click_action("bind codex");
-	if (!tc_check_resource("gold",1) && tc_check_resource("scrolls",1))
+	// Selling scrolls can be useful late game when we're automatically generating them,
+	// and buying scrolls is useful at the start,
+	// but there was a problem here when scrolls = max-1 and we bought a scroll, then scrolls were maxed but money wasn't
+	// so next tick we'd sell the scroll and so we'd never be able to max either.
+	if (tc_resources.get("gold")[0] < tc_resources.get("gold")[1] - 20 && tc_check_resource("scrolls",1))
 		tc_click_action("sell scroll");
 	else if (tc_check_resource("gold",1) && !tc_check_resource("scrolls",1))
 		tc_click_action("buy scroll");	// could fail if scribe above maxed them
@@ -498,6 +502,7 @@ function tc_autofocus()
 		if (!tc_focus && qs.innerHTML === "Focus")
 			tc_focus = qs;
 	}
+	if (!tc_bars.get("mana")) return;
 	var amt = tc_bars.get("mana")[0];
 	var max = tc_bars.get("mana")[1];
 
@@ -643,7 +648,7 @@ function tc_config_setup()
 	// Add equipment considered junk
 	var html = `
 <div id="config_options" class="settings popup" style="display:none; background-color:#eee; max-width:800px; position: absolute; bottom:15px; right: 15px; top: auto; left: auto;">
-<input type="checkbox" name="tc_suspend" id="tc_suspend" title="If unchecked, all automation is suspended. If checked depends on items enabled below."> enable automation of items below<br><br>
+<input type="checkbox" name="tc_suspend" id="tc_suspend" title="If unchecked, all automation is suspended. If checked, items enabled below will be run."> enable automation of items below<br><br>
 <input type="checkbox" name="tc_auto_misc" id="tc_auto_misc"> buy gems, sell herbs, scribe scrolls etc.<br>
 <input type="checkbox" name="tc_auto_focus" id="tc_auto_focus"> click focus while learning skills<br>
 <input type="checkbox" name="tc_auto_cast" id="tc_auto_cast" title="e.g. mana, fount"> cast common buff spells<br>
