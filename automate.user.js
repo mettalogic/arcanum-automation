@@ -578,7 +578,7 @@ function tc_save_settings()
 	tc_auto_misc = document.getElementById("tc_auto_misc").checked;
 	tc_auto_speed = parseInt(document.getElementById("tc_auto_speed").value);
 	tc_auto_speed_spells = parseInt(document.getElementById("tc_auto_speed_spells").value);
-	tc_debug = document.getElementById("tc_debug");
+	tc_debug = document.getElementById("tc_debug").checked;
 
 	localStorage.setItem("tc_suspend", tc_suspend);
 	localStorage.setItem("tc_auto_cast", tc_auto_cast);
