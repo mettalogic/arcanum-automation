@@ -619,7 +619,7 @@ function tc_show_config()
 	
 	// Set the background color as the user might have changed modes.
 	// Make it slightly lighter/darker than normal background so it's more obvious.
-	config.style.backgroundColor = document.firstElementChild.children[1].className == "darkmode" ? "#333" : "#eee";
+	config.style.backgroundColor = document.querySelector("body").classList.contains("darkmode") ? "#333" : "#eee";
 	 
 	tc_load_settings();
 	config.style.display = "block";
