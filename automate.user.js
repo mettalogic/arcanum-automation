@@ -616,16 +616,18 @@ function tc_show_config()
 {
 	var config = document.getElementById("config_options");
 	if (!config) return;
-	
+
 	// Set the background color as the user might have changed modes.
 	// Make it slightly lighter/darker than normal background so it's more obvious.
-	config.style.backgroundColor = document.querySelector("body").classList.contains("darkmode") ? "#333" : "#eee";
-	 
+	 	config.style.backgroundColor = document.querySelector("body").classList.contains("darkmode") ? "#333" : "#eee";
+
 	tc_load_settings();
 	config.style.display = "block";
 	if (tc_debug) console.log("config clicked");
 }
 
+// On Chrome with TamperMonkey, hit a problem where this was run too early -
+// The quickbar hadn't been set up and this function failed.
 function tc_config_setup()
 {
 	if (document.getElementById("automate_config")) return;
@@ -664,13 +666,19 @@ function tc_config_setup()
 <hr>
 <input type="checkbox" name="tc_debug" id="tc_debug"> send debug info to console<br>
 <hr>
-<button type="button" onclick="tc_close_config_cancel()">Cancel</button>
-<button type="button" onclick="tc_close_config_save()">Save</button>
+<button type="button" id="tc_close_config_cancel">Cancel</button>
+<button type="button" id="tc_close_config_save">Save</button>
 </div> `;
+
 	dummy.innerHTML = html;
 	document.body.firstElementChild.appendChild(dummy);
 
 	config.parentNode.insertBefore(configbtn, null);
+
+	// Now need to add the onClick handlers for the cancel/save buttons.
+	// Can't do this directly in the HTML above because the GreaseMonkey functions exist in a different namespace
+	document.getElementById("tc_close_config_cancel").addEventListener("click", tc_close_config_cancel);
+	document.getElementById("tc_close_config_save").addEventListener("click", tc_close_config_save);
 	if (tc_debug) console.log("Config button added");
 }
 
@@ -713,9 +721,22 @@ function start_timers()	// can be restarted by save_settings()
 	}, tc_auto_speed_spells);
 }
 
-setTimeout(function(){
-    // Do this before we start any timers - loads timer values etc. from local storage.
-    tc_config_setup();
-    tc_load_settings();
-    start_timers();
-},1000)
+// Need to make sure page has finished loading before we try to add buttons and set up timers,
+// so check every 100ms for quickbar to become visible before doing anything.
+
+var tc_load_count = 0;	// just for interest
+var tc_load_timer = window.setInterval(function() {
+	var config = document.querySelectorAll(".quickbar");
+	tc_load_count++;
+	if (config.length == 0) return;	// document not loaded yet
+
+	console.log("Document loaded after " + tc_load_count*100 + " ms");
+
+	// Do this before we start any timers - loads timer values etc. from local storage.
+	tc_config_setup();
+	tc_load_settings();
+
+	start_timers();
+
+	window.clearInterval(tc_load_timer);
+}, 100);
