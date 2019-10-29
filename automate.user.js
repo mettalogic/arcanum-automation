@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         aardvark arcanum auto
-// @version      0.50
+// @version      0.51
 // @author       aardvark
 // @description  Automates casting buffs, buying gems making types gems, making lore. Adds sell junk/dupe item buttons. Must open the main tab and the spells tab once to work.
 // @downloadURL  https://github.com/mettalogic/arcanum-automation/raw/master/automate.user.js
@@ -18,13 +18,14 @@ var tc_auto_misc = true;
 var tc_auto_cast = true;
 var tc_auto_focus = true;
 var tc_auto_heal = true;
+var tc_auto_adv = true;
 
 // Set to a adventure name to continously ruin that adventure, leave blank to disable
 var tc_auto_adventure = "";
-
+var tc_adventure_wait = 30;//How many ticks to wain to rerun an adventure
+var tc_adventure_wait_cd = 30;//Counts down
 /* The following can be increased by encounters in the adventure listed.
 (Stat) - ("dungeon name") (increased amount) (chance to get the encounter needed)
-
 Skills:
 Anatomy - "ruined crypt" 0.01 2/7
 Spirit Lore - "hestia's cottage" 0.001 1/6, "explore treffil wood" 0.001 1/6
@@ -38,7 +39,6 @@ Pyromancy - "fazbit's workshop" 0.001 1/7
 Alchemy - "fazbit's workshop" 0.001 2/7
 Minerology - "genezereth" 0.001 1/7
 Air Lore - "genezereth" 0.001 1/7
-
 Stats:
 Arcana - "pidwig's cove" 0.05 1/6
 */
@@ -51,6 +51,7 @@ var tc_resources = new Map();
 var tc_actions = new Map();
 var tc_bars = new Map();
 var tc_adventures = new Map();
+var tc_running = new Map();
 var tc_focus;
 
 var tc_time_offset = 0;
@@ -161,6 +162,16 @@ function tc_populate_adventures()
 	}
 }
 
+// Call every second to check what you are doing.
+function tc_populate_running()
+{
+	tc_running.clear();
+	for (let qs of document.querySelectorAll("div.running div")){
+		var key = qs.lastChild.innerText.toLowerCase();;
+		tc_running.set(key, qs.firstChild);
+	}
+}
+
 // Check if a resource is above a percentage. example: tc_check_resource("gold",.5);	// that's not a % lol
 function tc_check_resource(resource,percent) {
 	return !tc_resources.get(resource) || tc_resources.get(resource)[0] >= tc_resources.get(resource)[1] * percent;
@@ -169,6 +180,14 @@ function tc_check_resource(resource,percent) {
 // Check if a bar(mana etc) is above a percentage.
 function tc_check_bars(bars,percent) {
 	return !tc_bars.get(bars) || tc_bars.get(bars)[0] >= tc_bars.get(bars)[1] * percent;
+}
+
+// Check if you are in an adventure
+function tc_check_running_adv(){
+	for (let qs of tc_running.keys()) {
+		if (qs.split(/⚔|🎃|🌳/).length==2) return true;
+	}
+	return false;
 }
 
 // Return name of current tab
@@ -329,17 +348,31 @@ function tc_automate()
 	}
 }
 
-// For AUTOING. Runs an adventure again after you have finished it.
 function tc_autoadv()
 {
 	if (tc_suspend) return;
-	var lcl = tc_adventures.get(tc_auto_adventure);
-	if (!lcl) return;
+	if (!tc_auto_adv) return;
+	
+/* Only works on Adventure tab but I am not ready to get rid of it yet. ~linspatz
+	if (tc_gettab()=="adventure"){
+		var lcl = tc_adventures.get(tc_auto_adventure);
+		if (!lcl) return;
 
-	var advper = lcl[0]/lcl[1];
-	if (advper == 0 || advper == 1) tc_click_adv(tc_auto_adventure); // this might just need to be advper==1
-
+		var advper = lcl[0]/lcl[1];
+		if (advper == 0 || advper == 1) tc_click_adv(tc_auto_adventure); // this might just need to be advper==1
+	} 
+*/
+	if (tc_check_running_adv()==false){
+		if (tc_adventure_wait_cd <= 0){
+			tc_click_adv(tc_auto_adventure);
+			tc_adventure_wait_cd = tc_adventure_wait; // resets countdown
+		} else {
+			tc_adventure_wait_cd--;
+		}
+		
+	}
 }
+
 
 // Sells all items that are considered junk
 function tc_selljunk()
@@ -472,6 +505,7 @@ function tc_advsetup()
 {
 	if (tc_gettab() !== "adventure") return;
 	if (tc_suspend) return;
+	if (!tc_auto_adv) return;
 	// makes clicking flee disable the auto adventure
 	if (document.querySelector("div.game-main div.adventure div.explore .raid-btn"))
 	{
@@ -557,6 +591,9 @@ function tc_load_settings()
 	tc_auto_misc = get_val("tc_auto_misc", true, "bool");
 	tc_auto_speed = get_val("tc_auto_speed", 1000, "int");
 	tc_auto_speed_spells = get_val("tc_auto_speed_spells", 950, "int");
+	tc_auto_adv = get_val("tc_auto_adv", true, "bool");
+	tc_adventure_wait = get_val("tc_adventure_wait", 30, "int");	// needs to be below tc_auto_speed
+	tc_adventure_wait_cd = tc_adventure_wait;	//sets current cooldown to same time as wait period.
 	tc_debug = get_val("tc_debug", false, "bool");
 
 	document.getElementById("tc_suspend").checked = !tc_suspend;	// this one's backwards
@@ -566,6 +603,8 @@ function tc_load_settings()
 	document.getElementById("tc_auto_misc").checked = tc_auto_misc;
 	document.getElementById("tc_auto_speed").value = tc_auto_speed;
 	document.getElementById("tc_auto_speed_spells").value = tc_auto_speed_spells;
+	document.getElementById("tc_auto_adv").value = tc_auto_adv;
+	document.getElementById("tc_adventure_wait").value = (tc_adventure_wait / 1000 * tc_auto_speed);
 	document.getElementById("tc_debug").checked = tc_debug;
 }
 
@@ -578,6 +617,9 @@ function tc_save_settings()
 	tc_auto_misc = document.getElementById("tc_auto_misc").checked;
 	tc_auto_speed = parseInt(document.getElementById("tc_auto_speed").value);
 	tc_auto_speed_spells = parseInt(document.getElementById("tc_auto_speed_spells").value);
+	tc_auto_adv = document.getElementById("tc_auto_adv").checked;
+	tc_adventure_wait = (parseInt(document.getElementById("tc_adventure_wait").value) * 1000 / tc_auto_speed );
+	tc_adventure_wait_cd = tc_adventure_wait; 	//sets current cooldown to same time as wait period.
 	tc_debug = document.getElementById("tc_debug").checked;
 
 	localStorage.setItem("tc_suspend", tc_suspend);
@@ -587,6 +629,8 @@ function tc_save_settings()
 	localStorage.setItem("tc_auto_misc", tc_auto_misc);
 	localStorage.setItem("tc_auto_speed", tc_auto_speed);
 	localStorage.setItem("tc_auto_speed_spells", tc_auto_speed_spells);
+	localStorage.setItem("tc_auto_adv", tc_auto_adv);
+	localStorage.setItem("tc_adventure_wait", tc_adventure_wait);
 	localStorage.setItem("tc_debug", tc_debug);
 
 	// Now need to restart timers with new values
@@ -659,7 +703,9 @@ function tc_config_setup()
 <input type="checkbox" name="tc_auto_misc" id="tc_auto_misc"> buy gems, sell herbs, scribe scrolls etc.<br>
 <input type="checkbox" name="tc_auto_focus" id="tc_auto_focus"> click focus while learning skills<br>
 <input type="checkbox" name="tc_auto_cast" id="tc_auto_cast" title="e.g. mana, fount"> cast common buff spells<br>
-<input type="checkbox" name="tc_auto_heal" id="tc_auto_heal"> cast healing spells in combat<br>
+<input type="checkbox" name="tc_auto_heal" id="tc_auto_heal"> cast healing spells in combat<br><br>
+<input type="checkbox" name="tc_auto_adv" id="tc_auto_adv"> automatically reenter dungeons <br>
+<input type="text" name="tc_adventure_wait" id="tc_adventure_wait" width=10> number of seconds to wait before reentering an advventure<br>
 <hr>
 <input type="text" name="tc_auto_speed" id="tc_auto_speed" width=10> interval (ms) to run automation functions<br>
 <input type="text" name="tc_auto_speed_spells" id="tc_auto_speed_spells" width=10 title="Should be 1000 but reduce it if lag is causing spell buffs to expire"> interval (ms) for spellcast functions<br>
@@ -706,6 +752,7 @@ function start_timers()	// can be restarted by save_settings()
 		tc_populate_actions();
 		tc_populate_bars();
 		tc_populate_adventures();
+		tc_populate_running();
 		tc_automate();
 		tc_autofocus();
 		tc_autoheal();
