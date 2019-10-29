@@ -616,7 +616,11 @@ function tc_show_config()
 {
 	var config = document.getElementById("config_options");
 	if (!config) return;
-
+	
+	// Set the background color as the user might have changed modes.
+	// Make it slightly lighter/darker than normal background so it's more obvious.
+	config.style.backgroundColor = document.firstElementChild.children[1].className == "darkmode" ? "#333" : "#eee";
+	 
 	tc_load_settings();
 	config.style.display = "block";
 	if (tc_debug) console.log("config clicked");
@@ -642,12 +646,13 @@ function tc_config_setup()
 	configbtn.addEventListener("click", tc_show_config);
 
 	var dummy = document.createElement('div');	// this div won't be included, only the HTML below
-	// Need to specify a background color or the dialog will be transparent. Dark mode?
+	// Need to specify a background color or the dialog will be transparent.
+	// Will get fixed to match dark/light mode when it's opened in tc_show_config()
 	// Looks ugly, but will do for now.
 	// Add auto adventuring?
 	// Add equipment considered junk
 	var html = `
-<div id="config_options" class="settings popup" style="display:none; background-color:#eee; max-width:800px; position: absolute; bottom:15px; right: 15px; top: auto; left: auto;">
+<div id="config_options" class="settings popup" style="display:none; background-color:#777; max-width:800px; position: absolute; bottom:15px; right: 15px; top: auto; left: auto;">
 <input type="checkbox" name="tc_suspend" id="tc_suspend" title="If unchecked, all automation is suspended. If checked, items enabled below will be run."> enable automation of items below<br><br>
 <input type="checkbox" name="tc_auto_misc" id="tc_auto_misc"> buy gems, sell herbs, scribe scrolls etc.<br>
 <input type="checkbox" name="tc_auto_focus" id="tc_auto_focus"> click focus while learning skills<br>
