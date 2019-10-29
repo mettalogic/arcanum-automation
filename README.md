@@ -25,4 +25,4 @@ The Browser sub-directory contains a JSON browser written in C++ using the QT to
  
 Note that the file "seasonal.json" is mostly ignored currently as it has a slightly different layout.
 
-It's also possible to view the game save file in the Browser - just dump it into the same directory as the other JSON files and make it has an extension of ".json". The Browser won't do much with it, but can give a parse view of the file in the "Parsed data" tab.
+It's also possible to view the game save file in the Browser - just dump it into the same directory as the other JSON files and make sure it has an extension of ".json". The Browser won't do much with it, but can give a formatted view of the file in the "Parsed data" tab.
