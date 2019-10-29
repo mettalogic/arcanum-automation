@@ -679,10 +679,6 @@ function tc_config_setup()
 	Basic Automation Stuff
 */
 
-// Do this before we start any timers - loads timer values etc. from local storage.
-tc_config_setup();
-tc_load_settings();
-
 // Main timer for most functions
 var tc_timer_ac;
 // Timer for spells.
@@ -717,4 +713,9 @@ function start_timers()	// can be restarted by save_settings()
 	}, tc_auto_speed_spells);
 }
 
-start_timers();
+setTimeout(function(){
+    // Do this before we start any timers - loads timer values etc. from local storage.
+    tc_config_setup();
+    tc_load_settings();
+    start_timers();
+},1000)
