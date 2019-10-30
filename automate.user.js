@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         aardvark arcanum auto
-// @version      0.51
+// @version      0.52
 // @author       aardvark
 // @description  Automates casting buffs, buying gems making types gems, making lore. Adds sell junk/dupe item buttons. Must open the main tab and the spells tab once to work.
 // @downloadURL  https://github.com/mettalogic/arcanum-automation/raw/master/automate.user.js
@@ -19,8 +19,8 @@ var tc_auto_cast = true;
 var tc_auto_focus = true;
 var tc_auto_heal = true;
 var tc_auto_adv = true;
-
-// Set to a adventure name to continously ruin that adventure, leave blank to disable
+var tc_auto_focus_aggressive = false;
+// Set to a adventure name to continously run that adventure, leave blank to disable
 var tc_auto_adventure = "";
 var tc_adventure_wait = 30;//How many ticks to wain to rerun an adventure
 var tc_adventure_wait_cd = 30;//Counts down
@@ -53,8 +53,9 @@ var tc_bars = new Map();
 var tc_adventures = new Map();
 var tc_running = new Map();
 var tc_focus;
-
-var tc_time_offset = 0;
+var tc_rest;
+var tc_checked_spells = 0;	// have a look at the spell tab on startup
+var tc_time_offset = 0;	// used for casting spells - this will incr. every second
 
 // List of Gems that needs to be updated manually if changed.
 var tc_gems = {
@@ -96,6 +97,22 @@ var tc_autospells = {
 // Call this every second - will automatically pick up new spells
 function tc_populate_spells()
 {
+	// It can be confusing that autocast doesn't do anything until the spells tab is visited,
+	// so switch to it on startup and grab anything there.
+	if (tc_checked_spells == 0) {
+		tc_settab("spells");	// this might fail if spells not available yet
+		tc_checked_spells++;
+		// wait for tab to be displayed
+		return;
+	}
+	else if (tc_checked_spells == 1) {
+		if (tc_gettab() !== "spells") {
+			// switch tab failed - we don't have a spellbook yet
+			tc_checked_spells++;
+			return;
+		}
+	}
+
 	if (tc_gettab() !== "spells") return;
 
 	for (let qs of document.querySelectorAll(".spells .bottom .spellbook table tr")) {
@@ -106,6 +123,12 @@ function tc_populate_spells()
 				if (tc_debug) console.log("Saved spell: " + spell);
 			}
 		}
+	}
+
+	if (tc_checked_spells == 1) {
+		// switch tab succeeded and we've grabbed the spells, so switch back to main
+		tc_settab("main");
+		tc_checked_spells++;
 	}
 }
 
@@ -352,7 +375,7 @@ function tc_autoadv()
 {
 	if (tc_suspend) return;
 	if (!tc_auto_adv) return;
-	
+
 /* Only works on Adventure tab but I am not ready to get rid of it yet. ~linspatz
 	if (tc_gettab()=="adventure"){
 		var lcl = tc_adventures.get(tc_auto_adventure);
@@ -360,7 +383,7 @@ function tc_autoadv()
 
 		var advper = lcl[0]/lcl[1];
 		if (advper == 0 || advper == 1) tc_click_adv(tc_auto_adventure); // this might just need to be advper==1
-	} 
+	}
 */
 	if (tc_check_running_adv()==false){
 		if (tc_adventure_wait_cd <= 0){
@@ -369,7 +392,7 @@ function tc_autoadv()
 		} else {
 			tc_adventure_wait_cd--;
 		}
-		
+
 	}
 }
 
@@ -525,27 +548,96 @@ function tc_advsetup()
 	}
 }
 
+var tc_skill_saved = "";
+
 // Uses focus until you have only 10 mana left.
 function tc_autofocus()
 {
 	if (tc_suspend) return;
 	if (!tc_auto_focus) return;
 
-	if (!tc_focus)
-	for (let qs of document.querySelectorAll(".vitals div.separate button.btn-sm")) {
-		if (!tc_focus && qs.innerHTML === "Focus")
-			tc_focus = qs;
-	}
+	if (!tc_focus || !tc_rest)
+		for (let qs of document.querySelectorAll(".vitals div.separate button.btn-sm")) {
+			if (!tc_focus && qs.innerHTML === "Focus")
+				tc_focus = qs;
+			if (!tc_rest && qs.innerHTML.trim() === "rest")
+				tc_rest = qs;
+		}
 	if (!tc_bars.get("mana")) return;
+
 	var amt = tc_bars.get("mana")[0];
 	var max = tc_bars.get("mana")[1];
 
-	// 10 mana required for compile tome
-	var min = max < 11 ? max-1 : 10;
-	if (amt >= min) {
-		for (let i = 10 * (amt-min); i > 0; i--)
-			tc_focus.click();
+	if (tc_gettab() != "skills" || !tc_auto_focus_aggressive) {
+		tc_skill_saved = "";
+
+		// 10 mana required for compile tome
+		var min = max < 11 ? max-1 : 10;
+		if (amt >= min) {
+			for (let i = 10 * (amt-min); i > 0; i--)
+				tc_focus.click();
+		}
+		return;
 	}
+
+	// We're on the skills tab - try to: repeat {use up all mana with focusing, then rest to restore mana }
+	// Note that if we switch tabs while resting, we won't restart learning skill when finished resting.
+
+	// Try to find which skill we're currently learning - the user might have switched since we last looked.
+	// Otherwise if we have a saved skill which isn't maxed, choose that,
+	// Otherwise learn cheapest skill (only checks level, not learning rate)
+	// Most useful at start of game, probably won't work well when multiple runners are unlocked.
+	var lowest_lvl = 1000;
+	var lowest_skill = "";
+	var lowest_btn;
+	var skill_btn;
+	var skill_to_learn = "";
+	for (let qs of document.querySelectorAll(".skills .skill")) {
+		var skill = qs.firstElementChild.firstElementChild.innerHTML;
+		var btn = qs.querySelectorAll("button")[0];
+		var text = btn.innerHTML.trim();	// Can be Unlock, Train, Stop
+		if (text == "Unlock" || btn.disabled) continue;
+
+		if (text == "Stop") {	// it means we're training this skill
+			skill_to_learn = skill;
+			tc_skill_saved = skill;
+			skill_btn = btn;
+			if (tc_debug) console.log("Learning " + skill);
+			break;	// this takes precedence over anything else
+		}
+
+		if (skill == tc_skill_saved) {
+			// skill still available to be learnt - we'll end up learning this unless another is active
+			skill_to_learn = skill;
+			skill_btn = btn;
+		}
+
+		// qs.firstElementChild.children[1].childNodes[0].data	- to get "Lvl: 3/4"
+		var lvl = parseInt(qs.firstElementChild.children[1].childNodes[0].data.substr(5).split('/')[0]);
+		if (lvl < lowest_lvl) {
+			lowest_lvl = lvl;
+			lowest_skill = skill;
+			lowest_btn = btn;
+		}
+	}
+
+	if (skill_to_learn == "") {
+		if (lowest_skill == "")	// nothing available to learn
+			return;
+
+		skill_to_learn = lowest_skill;
+		skill_btn = lowest_btn;
+		if (tc_debug) console.log("Learn lowest skill: " + skill_to_learn);
+	}
+
+	if (skill_btn.innerHTML.trim() == "Train")
+		skill_btn.click();
+
+		// Use up all mana
+//		for (let i = 10 * amt; i > 0; i--)
+	for (let i = 10*amt; i > 0; i--)
+		tc_focus.click();
+	tc_rest.click();	// rest until next tick
 }
 
 // Autoheal based on avalibility of spells and need.
@@ -594,6 +686,7 @@ function tc_load_settings()
 	tc_auto_adv = get_val("tc_auto_adv", true, "bool");
 	tc_adventure_wait = get_val("tc_adventure_wait", 30, "int");	// needs to be below tc_auto_speed
 	tc_adventure_wait_cd = tc_adventure_wait;	//sets current cooldown to same time as wait period.
+	tc_auto_focus_aggressive = get_val("tc_auto_focus_aggressive", false, "bool");
 	tc_debug = get_val("tc_debug", false, "bool");
 
 	document.getElementById("tc_suspend").checked = !tc_suspend;	// this one's backwards
@@ -603,8 +696,9 @@ function tc_load_settings()
 	document.getElementById("tc_auto_misc").checked = tc_auto_misc;
 	document.getElementById("tc_auto_speed").value = tc_auto_speed;
 	document.getElementById("tc_auto_speed_spells").value = tc_auto_speed_spells;
-	document.getElementById("tc_auto_adv").value = tc_auto_adv;
+	document.getElementById("tc_auto_adv").checked = tc_auto_adv;
 	document.getElementById("tc_adventure_wait").value = (tc_adventure_wait / 1000 * tc_auto_speed);
+	document.getElementById("tc_auto_focus_aggressive").checked = tc_auto_focus_aggressive;
 	document.getElementById("tc_debug").checked = tc_debug;
 }
 
@@ -620,6 +714,7 @@ function tc_save_settings()
 	tc_auto_adv = document.getElementById("tc_auto_adv").checked;
 	tc_adventure_wait = (parseInt(document.getElementById("tc_adventure_wait").value) * 1000 / tc_auto_speed );
 	tc_adventure_wait_cd = tc_adventure_wait; 	//sets current cooldown to same time as wait period.
+	tc_auto_focus_aggressive = document.getElementById("tc_auto_focus_aggressive").checked;
 	tc_debug = document.getElementById("tc_debug").checked;
 
 	localStorage.setItem("tc_suspend", tc_suspend);
@@ -631,10 +726,11 @@ function tc_save_settings()
 	localStorage.setItem("tc_auto_speed_spells", tc_auto_speed_spells);
 	localStorage.setItem("tc_auto_adv", tc_auto_adv);
 	localStorage.setItem("tc_adventure_wait", tc_adventure_wait);
+	localStorage.setItem("tc_auto_focus_aggressive", tc_auto_focus_aggressive);
 	localStorage.setItem("tc_debug", tc_debug);
 
 	// Now need to restart timers with new values
-	start_timers();
+	tc_start_timers();
 }
 
 function tc_close_config_cancel()
@@ -663,15 +759,13 @@ function tc_show_config()
 
 	// Set the background color as the user might have changed modes.
 	// Make it slightly lighter/darker than normal background so it's more obvious.
-	 	config.style.backgroundColor = document.querySelector("body").classList.contains("darkmode") ? "#333" : "#eee";
+	config.style.backgroundColor = document.querySelector("body").classList.contains("darkmode") ? "#333" : "#eee";
 
 	tc_load_settings();
 	config.style.display = "block";
 	if (tc_debug) console.log("config clicked");
 }
 
-// On Chrome with TamperMonkey, hit a problem where this was run too early -
-// The quickbar hadn't been set up and this function failed.
 function tc_config_setup()
 {
 	if (document.getElementById("automate_config")) return;
@@ -705,11 +799,13 @@ function tc_config_setup()
 <input type="checkbox" name="tc_auto_cast" id="tc_auto_cast" title="e.g. mana, fount"> cast common buff spells<br>
 <input type="checkbox" name="tc_auto_heal" id="tc_auto_heal"> cast healing spells in combat<br><br>
 <input type="checkbox" name="tc_auto_adv" id="tc_auto_adv"> automatically reenter dungeons <br>
-<input type="text" name="tc_adventure_wait" id="tc_adventure_wait" width=10> number of seconds to wait before reentering an advventure<br>
+<input type="text" name="tc_adventure_wait" id="tc_adventure_wait" width=10> number of seconds to wait before reentering an adventure<br>
 <hr>
 <input type="text" name="tc_auto_speed" id="tc_auto_speed" width=10> interval (ms) to run automation functions<br>
 <input type="text" name="tc_auto_speed_spells" id="tc_auto_speed_spells" width=10 title="Should be 1000 but reduce it if lag is causing spell buffs to expire"> interval (ms) for spellcast functions<br>
 <hr>
+Advanced features:<br>
+<input type="checkbox" name="tc_auto_focus_aggressive" id="tc_auto_focus_aggressive" title="Only works while in skills. Attempts to alternate rest and focus to maximise learning speed. Will switch to lowest level skill when current one is maxed. May have odd behaviour at times."> try to learn faster when in skills tab<br>
 <input type="checkbox" name="tc_debug" id="tc_debug"> send debug info to console<br>
 <hr>
 <button type="button" id="tc_close_config_cancel">Cancel</button>
@@ -739,7 +835,7 @@ var tc_timer_ac;
 // Can't guarantee that timer will work exactly every second, so can reduce interval to compensate so spells don't run out
 var tc_timer_autocast;
 
-function start_timers()	// can be restarted by save_settings()
+function tc_start_timers()	// can be restarted by save_settings()
 {
 	if (tc_timer_ac != undefined)
 		window.clearInterval(tc_timer_ac);
@@ -783,7 +879,7 @@ var tc_load_timer = window.setInterval(function() {
 	tc_config_setup();
 	tc_load_settings();
 
-	start_timers();
+	tc_start_timers();
 
 	window.clearInterval(tc_load_timer);
 }, 100);
