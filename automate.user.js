@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         aardvark arcanum auto
-// @version      0.53
+// @version      0.54
 // @author       aardvark
 // @description  Automates casting buffs, buying gems making types gems, making lore. Adds sell junk/dupe item buttons. Must open the main tab and the spells tab once to work.
 // @downloadURL  https://github.com/mettalogic/arcanum-automation/raw/master/automate.user.js
@@ -135,7 +135,10 @@ function tc_populate_spells()
 // Call this every second to update resource values
 function tc_populate_resources()
 {
-	for (let n of document.querySelectorAll("div.game-main div.resource-list tr.item-name:not(.locked)")) {
+	var actions = document.querySelectorAll("div.game-main div.resource-list tr.item-name:not(.locked)");
+	if (actions.length == 0)
+		actions =document.querySelectorAll("div.game-main div.res-list div");
+	for (let n of actions) {
 		var name = n.firstElementChild.innerHTML.toLowerCase();
 		var vals = n.lastElementChild.innerHTML.split("/");
 		var val0 = parseInt(vals[0]);
