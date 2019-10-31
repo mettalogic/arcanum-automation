@@ -168,6 +168,13 @@ function tc_populate_actions()
 			if (tc_debug) console.log("Action stored: " + qs.innerHTML);
 		}
 	}
+	for (let qs of document.querySelectorAll(".main-actions .upgrade-list .action-btn:not(.locked) .wrapped-btn:not([disabled])")) {
+		var key = qs.innerHTML.toLowerCase();
+		if (!tc_actions.get(key)) {
+			tc_actions.set(key, qs);
+			if (tc_debug) console.log("Action stored: " + qs.innerHTML);
+		}
+	}
 }
 
 // Call every second to look for new adventures and adventures that are now active.
@@ -353,13 +360,17 @@ function tc_automate()
 
 	// If gems maxed, try making some different ones
 	if (tc_check_resource("gems",1)) {
+		var bought_gem = false;
 		for (var gem in tc_gems) {	// try to make one of each
 			if (!tc_check_resource(gem,1)) {
 				if (tc_debug) console.log("not maxed " + gem + " calling " + tc_gems[gem]);
-				tc_click_action(tc_gems[gem]);
+				if (tc_click_action(tc_gems[gem]))
+					bought_gem = true;
 			}
 		}
-		// could also buy the gem box here
+		// or buy the gem box
+		if (!bought_gem)
+			tc_click_action("gem box");
 	}
 
 	// Sublimate lore
