@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         aardvark arcanum auto
-// @version      0.55
+// @version      0.56
 // @author       aardvark
 // @description  Automates casting buffs, buying gems making types gems, making lore. Adds sell junk/dupe item buttons. Must open the main tab and the spells tab once to work.
 // @downloadURL  https://github.com/mettalogic/arcanum-automation/raw/master/automate.user.js
@@ -17,9 +17,12 @@ var tc_suspend = false;		// set this to true in console to suspend all auto func
 var tc_auto_misc = true;
 var tc_auto_cast = true;
 var tc_auto_focus = true;
+var tc_auto_advise = false;
 var tc_auto_heal = true;
 var tc_auto_adv = true;
 var tc_auto_focus_aggressive = false;
+var tc_auto_focus_lowest = false;
+
 // Set to a adventure name to continously run that adventure, leave blank to disable
 var tc_auto_adventure = "";
 var tc_adventure_wait = 30;//How many ticks to wain to rerun an adventure
@@ -582,6 +585,27 @@ function tc_advsetup()
 	}
 }
 
+
+// Quick and dirty. Needs to be worked on to allow you to set which action to press for gold
+function tc_autoadvise()
+{
+	if (tc_suspend) return;
+	if (!tc_auto_advise) return;
+	
+	var amt = tc_bars.get("stamina")[0];
+	var max = tc_bars.get("stamina")[1];
+	
+	var min = max < 11 ? max-1 : max-5;
+	if (amt >= min) {
+		for (let i = 30 * (amt-min); i > 0; i=i-3)
+		{
+			tc_click_action("advise notables");
+			if (tc_check_resource("gold",1)) return;
+		}
+	}
+	return;
+}
+
 var tc_skill_saved = "";
 
 // Uses focus until you have only 10 mana left.
@@ -663,10 +687,10 @@ function tc_autofocus()
 		skill_btn = lowest_btn;
 		if (tc_debug) console.log("Learn lowest skill: " + skill_to_learn);
 	}
-
+	
+	
 	if (skill_btn.innerHTML.trim() == "Train")
 		skill_btn.click();
-
 		// Use up all mana
 /* Original auto focus click code.
 		for (let i = 10 * amt; i > 0; i--)
@@ -732,10 +756,12 @@ function tc_load_settings()
 	tc_auto_misc = get_val("tc_auto_misc", true, "bool");
 	tc_auto_speed = get_val("tc_auto_speed", 1000, "int");
 	tc_auto_speed_spells = get_val("tc_auto_speed_spells", 950, "int");
+	tc_auto_advise = get_val("tc_auto_advise", false, "bool");
 	tc_auto_adv = get_val("tc_auto_adv", true, "bool");
 	tc_adventure_wait = get_val("tc_adventure_wait", 30, "int");	// needs to be below tc_auto_speed
 	tc_adventure_wait_cd = tc_adventure_wait;	//sets current cooldown to same time as wait period.
 	tc_auto_focus_aggressive = get_val("tc_auto_focus_aggressive", false, "bool");
+	tc_auto_focus_lowest = get_val("tc_auto_focus_lowest", false, "bool");
 	tc_debug = get_val("tc_debug", false, "bool");
 
 	document.getElementById("tc_suspend").checked = !tc_suspend;	// this one's backwards
@@ -745,9 +771,11 @@ function tc_load_settings()
 	document.getElementById("tc_auto_misc").checked = tc_auto_misc;
 	document.getElementById("tc_auto_speed").value = tc_auto_speed;
 	document.getElementById("tc_auto_speed_spells").value = tc_auto_speed_spells;
+	document.getElementById("tc_auto_advise").checked = tc_auto_advise;
 	document.getElementById("tc_auto_adv").checked = tc_auto_adv;
 	document.getElementById("tc_adventure_wait").value = (tc_adventure_wait / 1000 * tc_auto_speed);
 	document.getElementById("tc_auto_focus_aggressive").checked = tc_auto_focus_aggressive;
+	document.getElementById("tc_auto_focus_lowest").checked = tc_auto_focus_lowest;
 	document.getElementById("tc_debug").checked = tc_debug;
 }
 
@@ -760,10 +788,12 @@ function tc_save_settings()
 	tc_auto_misc = document.getElementById("tc_auto_misc").checked;
 	tc_auto_speed = parseInt(document.getElementById("tc_auto_speed").value);
 	tc_auto_speed_spells = parseInt(document.getElementById("tc_auto_speed_spells").value);
+	tc_auto_advise = document.getElementById("tc_auto_advise").checked;
 	tc_auto_adv = document.getElementById("tc_auto_adv").checked;
 	tc_adventure_wait = (parseInt(document.getElementById("tc_adventure_wait").value) * 1000 / tc_auto_speed );
 	tc_adventure_wait_cd = tc_adventure_wait; 	//sets current cooldown to same time as wait period.
 	tc_auto_focus_aggressive = document.getElementById("tc_auto_focus_aggressive").checked;
+	tc_auto_focus_lowest = document.getElementById("tc_auto_focus_lowest").checked;
 	tc_debug = document.getElementById("tc_debug").checked;
 
 	localStorage.setItem("tc_suspend", tc_suspend);
@@ -773,9 +803,11 @@ function tc_save_settings()
 	localStorage.setItem("tc_auto_misc", tc_auto_misc);
 	localStorage.setItem("tc_auto_speed", tc_auto_speed);
 	localStorage.setItem("tc_auto_speed_spells", tc_auto_speed_spells);
+	localStorage.setItem("tc_auto_advise", tc_auto_advise);
 	localStorage.setItem("tc_auto_adv", tc_auto_adv);
 	localStorage.setItem("tc_adventure_wait", tc_adventure_wait);
 	localStorage.setItem("tc_auto_focus_aggressive", tc_auto_focus_aggressive);
+	localStorage.setItem("tc_auto_focus_lowest", tc_auto_focus_lowest);
 	localStorage.setItem("tc_debug", tc_debug);
 
 	// Now need to restart timers with new values
@@ -846,15 +878,18 @@ function tc_config_setup()
 <input type="checkbox" name="tc_auto_misc" id="tc_auto_misc"> buy gems, sell herbs, scribe scrolls etc.<br>
 <input type="checkbox" name="tc_auto_focus" id="tc_auto_focus"> click focus while learning skills<br>
 <input type="checkbox" name="tc_auto_cast" id="tc_auto_cast" title="e.g. mana, fount"> cast common buff spells<br>
-<input type="checkbox" name="tc_auto_heal" id="tc_auto_heal"> cast healing spells in combat<br><br>
 <input type="checkbox" name="tc_auto_adv" id="tc_auto_adv"> automatically reenter dungeons <br>
+<input type="checkbox" name="tc_auto_heal" id="tc_auto_heal"> cast healing spells in combat<br><br>
+<input type="checkbox" name="tc_auto_advise" id="tc_auto_advise" title="Clicks advise notables when you have enough stamina and you are in need of gold. "> clicks advise notables when gold is low<br> 
 <input type="text" name="tc_adventure_wait" id="tc_adventure_wait" width=10> number of seconds to wait before reentering an adventure<br>
 <hr>
 <input type="text" name="tc_auto_speed" id="tc_auto_speed" width=10> interval (ms) to run automation functions<br>
 <input type="text" name="tc_auto_speed_spells" id="tc_auto_speed_spells" width=10 title="Should be 1000 but reduce it if lag is causing spell buffs to expire"> interval (ms) for spellcast functions<br>
 <hr>
 Advanced features:<br>
-<input type="checkbox" name="tc_auto_focus_aggressive" id="tc_auto_focus_aggressive" title="Only works while in skills. Attempts to alternate rest and focus to maximise learning speed. Will switch to lowest level skill when current one is maxed. May have odd behaviour at times."> try to learn faster when in skills tab<br>
+<input type="checkbox" name="tc_auto_focus_aggressive" id="tc_auto_focus_aggressive" title="Only works while in skills. Attempts to alternate between rests and focus to maximise learning speed. Will switch to lowest level skill when current one is maxed. May have odd behaviour at times."> try to learn faster when in skills tab<br>
+
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<input type="checkbox" name="tc_auto_focus_lowest" id="tc_auto_focus_lowest" title ="BROKEN always switch to level your lowest level skill instead of waiting for it to max out.">always switch to lowest level skill</br>
 <input type="checkbox" name="tc_debug" id="tc_debug"> send debug info to console<br>
 <hr>
 <button type="button" id="tc_close_config_cancel">Cancel</button>
@@ -904,6 +939,7 @@ function tc_start_timers()	// can be restarted by save_settings()
 		tc_autoadv();
 		tc_sellsetup();
 		tc_advsetup();
+		tc_autoadvise();
 	}, tc_auto_speed);
 
 	tc_timer_autocast = window.setInterval(function() {
