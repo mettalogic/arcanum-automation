@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         aardvark arcanum auto
-// @version      0.56
+// @version      0.57
 // @author       aardvark
 // @description  Automates casting buffs, buying gems making types gems, making lore. Adds sell junk/dupe item buttons. Must open the main tab and the spells tab once to work.
 // @downloadURL  https://github.com/mettalogic/arcanum-automation/raw/master/automate.user.js
@@ -140,7 +140,7 @@ function tc_populate_resources()
 {
 	var actions = document.querySelectorAll("div.game-main div.resource-list tr.item-name:not(.locked)");
 	if (actions.length == 0)
-		actions =document.querySelectorAll("div.game-main div.res-list div");
+		actions = document.querySelectorAll("div.game-main div.res-list div");
 	for (let n of actions) {
 		var name = n.firstElementChild.innerHTML.toLowerCase();
 		var vals = n.lastElementChild.innerHTML.split("/");
@@ -203,7 +203,7 @@ function tc_populate_running()
 {
 	tc_running.clear();
 	for (let qs of document.querySelectorAll("div.running div")){
-		var key = qs.lastChild.innerText.toLowerCase();;
+		var key = qs.lastElementChild.innerHTML.toLowerCase();
 		tc_running.set(key, qs.firstChild);
 	}
 }
@@ -287,7 +287,7 @@ function tc_cast_spell(spell)
 {
 	var spl = tc_spells.get(spell);
 	if (!spl) return false;
-	if (!spl.innerText.toLowerCase() == "cast") return false;//Checks if spell is learnt yet.
+	if (!spl.innerText.toLowerCase() == "cast") return false;//Checks if spell is learnt.
 
 	if (spl.disabled) {	// not sure how this happens, but seems to prevent action ever being called again
 		if (tc_debug) console.log("Spell '" + spell + "' was disabled - deleting it");
@@ -706,8 +706,8 @@ function tc_autofocus()
 			tc_focus.click();
 	}
 		
-	tc_click_action("chant");
-	tc_click_action("commune");
+//	tc_click_action("chant");
+//	tc_click_action("commune");
 	tc_click_action("rest");
 // codeblock end
 
@@ -889,7 +889,7 @@ function tc_config_setup()
 Advanced features:<br>
 <input type="checkbox" name="tc_auto_focus_aggressive" id="tc_auto_focus_aggressive" title="Only works while in skills. Attempts to alternate between rests and focus to maximise learning speed. Will switch to lowest level skill when current one is maxed. May have odd behaviour at times."> try to learn faster when in skills tab<br>
 
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<input type="checkbox" name="tc_auto_focus_lowest" id="tc_auto_focus_lowest" title ="BROKEN always switch to level your lowest level skill instead of waiting for it to max out.">always switch to lowest level skill</br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<input type="checkbox" name="tc_auto_focus_lowest" id="tc_auto_focus_lowest" title ="always switch to level your lowest level skill instead of waiting for it to max out.">Not Yet Working.</br>
 <input type="checkbox" name="tc_debug" id="tc_debug"> send debug info to console<br>
 <hr>
 <button type="button" id="tc_close_config_cancel">Cancel</button>
