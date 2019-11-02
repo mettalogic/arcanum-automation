@@ -65,13 +65,13 @@ var tc_gems = {
 	"arcane gem" : "imbue gem (arcane)",
 	"fire gem" : "imbue gem (fire)",
 	"water gem" : "imbue gem (water)",
-	"nature gem" : "imbue lifegem",
-	"earth gem" : "imbue stone",
+	"nature gem" : "imbue lifegem (nature)",
+	"earth gem" : "imbue stone (earth)",
 	"air gem" : "imbue gem (air)",
 	"shadow gem" : "imbue gem (shadow)",
 	"light gem" : "imbue gem (light)",
 	"spirit gem" : "imbue gem (spirit)",
-	"blood gem" : "coagulate gem",
+	"blood gem" : "coagulate gem (blood)",
 };
 
 // List of spells to autocast when needed without using quickbar (and interval to cast at)
