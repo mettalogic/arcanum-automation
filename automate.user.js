@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         aardvark arcanum auto
-// @version      0.57
+// @version      0.58
 // @author       aardvark
 // @description  Automates casting buffs, buying gems making types gems, making lore. Adds sell junk/dupe item buttons. Must open the main tab and the spells tab once to work.
 // @downloadURL  https://github.com/mettalogic/arcanum-automation/raw/master/automate.user.js
@@ -8,6 +8,8 @@
 // @match        https://game312933.konggames.com/gamez/0031/2933/*
 // @run-at       document-idle
 // ==/UserScript==
+
+var tc_arcanum_ver = 10000;		// used to allow backwards compatibility
 
 var tc_debug = false;	// set to true to see debug messages
 
@@ -17,7 +19,7 @@ var tc_suspend = false;		// set this to true in console to suspend all auto func
 var tc_auto_misc = true;
 var tc_auto_cast = true;
 var tc_auto_focus = true;
-var tc_auto_advise = false;
+var tc_auto_earn_gold = false;
 var tc_auto_heal = true;
 var tc_auto_adv = true;
 var tc_auto_focus_aggressive = false;
@@ -97,6 +99,14 @@ var tc_autospells = {
 	"pulsing light III" : 120,
 };
 
+// One-off actions that earn gold ordered from best to worst (gold/stamina), and stamina cost/click.
+// Some also have side effects: ignore actions with negative side effects including using mana (conflict with autofocus).
+var tc_actions_gold = {
+	"advise notables" : 0.3,	// 4.5  (0.35 + .1 + .1 + .3 + .5) / .3  - after 1500 turns
+	"do chores" : 0.17,			// 2.94 (0.3 + .1 + .1) / 0.17 - after 250 turns
+	"clean stables" : 0.08,		// 2.5  (0.2 / 0.08)
+};
+
 // Call this every second - will automatically pick up new spells
 function tc_populate_spells()
 {
@@ -138,10 +148,10 @@ function tc_populate_spells()
 // Call this every second to update resource values
 function tc_populate_resources()
 {
-	var actions = document.querySelectorAll("div.game-main div.resource-list tr.item-name:not(.locked)");
-	if (actions.length == 0)
-		actions = document.querySelectorAll("div.game-main div.res-list div");
-	for (let n of actions) {
+	var resources = document.querySelectorAll("div.game-main div.resource-list tr.item-name:not(.locked)");
+	if (resources.length == 0)
+		resources = document.querySelectorAll("div.game-main div.res-list div");
+	for (let n of resources) {
 		var name = n.firstElementChild.innerHTML.toLowerCase();
 		var vals = n.lastElementChild.innerHTML.split("/");
 		var val0 = parseInt(vals[0]);
@@ -540,22 +550,19 @@ function tc_sellsetup()
 	sellall.parentNode.insertBefore(selldups, null);
 
 
-/* Newest versions of the game come with its own loot filter. This code will no longer be needed when both sites update.
-*/
-
-if (document.querySelector(".link-bar .vers").innerText.split(' ')[1]<400){
-	var br = document.createElement("br");
-	var t3 = document.createTextNode("Filter");
-	var filter = document.createElement("Input");
-	filter.addEventListener("keyup", tc_lootfilter);
-	filter.id = "lootfilter";
-	filter.width = "50";
+	// Newest versions of the game come with its own loot filter. This code will no longer be needed when both sites update.
+	if (tc_arcanum_ver < 400){
+		var t3 = document.createTextNode("Filter");
+		var filter = document.createElement("Input");
+		filter.addEventListener("keyup", tc_lootfilter);
+		filter.id = "lootfilter";
+		filter.width = "50";
 
 
-	sellall.parentNode.insertBefore(br, null);
-	sellall.parentNode.insertBefore(t3, null);
-	sellall.parentNode.insertBefore(filter, null);
-}
+		sellall.parentNode.insertBefore(br, null);
+		sellall.parentNode.insertBefore(t3, null);
+		sellall.parentNode.insertBefore(filter, null);
+	}
 
 	if (tc_debug) console.log("Sell buttons added");
 }
@@ -585,25 +592,36 @@ function tc_advsetup()
 	}
 }
 
-
 // Quick and dirty. Needs to be worked on to allow you to set which action to press for gold
-function tc_autoadvise()
+function tc_autoearngold()
 {
 	if (tc_suspend) return;
-	if (!tc_auto_advise) return;
-	
-	var amt = tc_bars.get("stamina")[0];
-	var max = tc_bars.get("stamina")[1];
-	
-	var min = max < 11 ? max-1 : max-5;
-	if (amt >= min) {
-		for (let i = 30 * (amt-min); i > 0; i=i-3)
-		{
-			tc_click_action("advise notables");
-			if (tc_check_resource("gold",1)) return;
+	if (!tc_auto_earn_gold) return;
+
+	// Find which action we can do
+	var action = undefined;
+	for (let act in tc_actions_gold) {
+		var a = tc_actions.get(act);
+		if (a && !a.disabled) {
+			action = act;
+			break;
 		}
 	}
-	return;
+	if (!action) return; 	// no money-making actions available to us
+	var stam = tc_actions_gold[action];
+
+	var amt = tc_bars.get("stamina")[0];
+	var max = tc_bars.get("stamina")[1];
+
+	// This is quite efficient while resting, but then need to make sure we don't hit max stamina or resting will stop.
+	// However if adventuring, this will mean we delay re-entering dungeon as resting never stops until we hit max gold.
+	var min = max < 11 ? max-2 : max-5;
+	if (amt >= min) {
+		for (let i = (amt-min)/stam; i > 0; i--) {
+			if (tc_check_resource("gold", 1)) return;	// not sure if this will get updated every click
+			tc_click_action(action);
+		}
+	}
 }
 
 var tc_skill_saved = "";
@@ -640,6 +658,7 @@ function tc_autofocus()
 
 	// We're on the skills tab - try to: repeat {use up all mana with focusing, then rest to restore mana }
 	// Note that if we switch tabs while resting, we won't restart learning skill when finished resting.
+	// As click() actions don't get processed immediately, we need to cheat by un-disabling some buttons.
 
 	// Try to find which skill we're currently learning - the user might have switched since we last looked.
 	// Otherwise if we have a saved skill which isn't maxed, choose that,
@@ -687,30 +706,23 @@ function tc_autofocus()
 		skill_btn = lowest_btn;
 		if (tc_debug) console.log("Learn lowest skill: " + skill_to_learn);
 	}
-	
-	
+
 	if (skill_btn.innerHTML.trim() == "Train")
 		skill_btn.click();
-		// Use up all mana
-/* Original auto focus click code.
-		for (let i = 10 * amt; i > 0; i--)
-	for (let i = 10*amt; i > 0; i--)
-		tc_focus.click();
-	tc_rest.click();// rest until next tick
-*/
 
-// Linspatz's triple rest action + save mana for tomes modification.
+	// Linspatz's triple rest action + save mana for tomes modification.
+	// - except can't triple rest and learn tomes at the same time ...
 	var min = max < 11 ? max-1 : 10;
 	if (amt >= min) {
+		tc_focus.disabled = false;	// button probably hasn't been updated yet, but we can cheat
 		for (let i = 10 * (amt-min); i > 0; i--)
 			tc_focus.click();
 	}
-		
+
 //	tc_click_action("chant");
 //	tc_click_action("commune");
-	tc_click_action("rest");
-// codeblock end
-
+	tc_rest.disabled = false;
+	tc_rest.click();
 }
 
 // Autoheal based on avalibility of spells and need.
@@ -756,7 +768,7 @@ function tc_load_settings()
 	tc_auto_misc = get_val("tc_auto_misc", true, "bool");
 	tc_auto_speed = get_val("tc_auto_speed", 1000, "int");
 	tc_auto_speed_spells = get_val("tc_auto_speed_spells", 950, "int");
-	tc_auto_advise = get_val("tc_auto_advise", false, "bool");
+	tc_auto_earn_gold = get_val("tc_auto_earn_gold", false, "bool");
 	tc_auto_adv = get_val("tc_auto_adv", true, "bool");
 	tc_adventure_wait = get_val("tc_adventure_wait", 30, "int");	// needs to be below tc_auto_speed
 	tc_adventure_wait_cd = tc_adventure_wait;	//sets current cooldown to same time as wait period.
@@ -771,7 +783,7 @@ function tc_load_settings()
 	document.getElementById("tc_auto_misc").checked = tc_auto_misc;
 	document.getElementById("tc_auto_speed").value = tc_auto_speed;
 	document.getElementById("tc_auto_speed_spells").value = tc_auto_speed_spells;
-	document.getElementById("tc_auto_advise").checked = tc_auto_advise;
+	document.getElementById("tc_auto_earn_gold").checked = tc_auto_earn_gold;
 	document.getElementById("tc_auto_adv").checked = tc_auto_adv;
 	document.getElementById("tc_adventure_wait").value = (tc_adventure_wait / 1000 * tc_auto_speed);
 	document.getElementById("tc_auto_focus_aggressive").checked = tc_auto_focus_aggressive;
@@ -788,7 +800,7 @@ function tc_save_settings()
 	tc_auto_misc = document.getElementById("tc_auto_misc").checked;
 	tc_auto_speed = parseInt(document.getElementById("tc_auto_speed").value);
 	tc_auto_speed_spells = parseInt(document.getElementById("tc_auto_speed_spells").value);
-	tc_auto_advise = document.getElementById("tc_auto_advise").checked;
+	tc_auto_earn_gold = document.getElementById("tc_auto_earn_gold").checked;
 	tc_auto_adv = document.getElementById("tc_auto_adv").checked;
 	tc_adventure_wait = (parseInt(document.getElementById("tc_adventure_wait").value) * 1000 / tc_auto_speed );
 	tc_adventure_wait_cd = tc_adventure_wait; 	//sets current cooldown to same time as wait period.
@@ -803,7 +815,7 @@ function tc_save_settings()
 	localStorage.setItem("tc_auto_misc", tc_auto_misc);
 	localStorage.setItem("tc_auto_speed", tc_auto_speed);
 	localStorage.setItem("tc_auto_speed_spells", tc_auto_speed_spells);
-	localStorage.setItem("tc_auto_advise", tc_auto_advise);
+	localStorage.setItem("tc_auto_earn_gold", tc_auto_earn_gold);
 	localStorage.setItem("tc_auto_adv", tc_auto_adv);
 	localStorage.setItem("tc_adventure_wait", tc_adventure_wait);
 	localStorage.setItem("tc_auto_focus_aggressive", tc_auto_focus_aggressive);
@@ -847,6 +859,29 @@ function tc_show_config()
 	if (tc_debug) console.log("config clicked");
 }
 
+function tc_config_help()
+{
+	var help = document.getElementById("config_help");
+	if (!help) return;
+
+	// Set the background color as the user might have changed modes.
+	// Make it slightly lighter/darker than normal background so it's more obvious.
+	help.style.backgroundColor = document.querySelector("body").classList.contains("darkmode") ? "#333" : "#eee";
+
+	tc_load_settings();
+	help.style.display = "block";
+	if (tc_debug) console.log("config help clicked");
+}
+
+function tc_help_close()
+{
+	var help = document.getElementById("config_help");
+	if (!help) return;
+
+	help.style.display = "none";
+	if (tc_debug) console.log("config help closed");
+}
+
 function tc_config_setup()
 {
 	if (document.getElementById("automate_config")) return;
@@ -873,14 +908,15 @@ function tc_config_setup()
 	// Add auto adventuring?
 	// Add equipment considered junk
 	var html = `
+<!-- Configuration Option -->
 <div id="config_options" class="settings popup" style="display:none; background-color:#777; max-width:800px; position: absolute; bottom:15px; right: 15px; top: auto; left: auto;">
 <input type="checkbox" name="tc_suspend" id="tc_suspend" title="If unchecked, all automation is suspended. If checked, items enabled below will be run."> enable automation of items below<br><br>
 <input type="checkbox" name="tc_auto_misc" id="tc_auto_misc"> buy gems, sell herbs, scribe scrolls etc.<br>
+<input type="checkbox" name="tc_auto_earn_gold" id="tc_auto_earn_gold" title="Clicks one-off tasks like \"do chores\" or \"advise notables\" when you have enough stamina and you are in need of gold. "> click actions which make gold when gold is low<br>
 <input type="checkbox" name="tc_auto_focus" id="tc_auto_focus"> click focus while learning skills<br>
 <input type="checkbox" name="tc_auto_cast" id="tc_auto_cast" title="e.g. mana, fount"> cast common buff spells<br>
-<input type="checkbox" name="tc_auto_adv" id="tc_auto_adv"> automatically reenter dungeons <br>
 <input type="checkbox" name="tc_auto_heal" id="tc_auto_heal"> cast healing spells in combat<br><br>
-<input type="checkbox" name="tc_auto_advise" id="tc_auto_advise" title="Clicks advise notables when you have enough stamina and you are in need of gold. "> clicks advise notables when gold is low<br> 
+<input type="checkbox" name="tc_auto_adv" id="tc_auto_adv"> automatically reenter dungeons <br>
 <input type="text" name="tc_adventure_wait" id="tc_adventure_wait" width=10> number of seconds to wait before reentering an adventure<br>
 <hr>
 <input type="text" name="tc_auto_speed" id="tc_auto_speed" width=10> interval (ms) to run automation functions<br>
@@ -892,8 +928,27 @@ Advanced features:<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<input type="checkbox" name="tc_auto_focus_lowest" id="tc_auto_focus_lowest" title ="always switch to level your lowest level skill instead of waiting for it to max out.">Not Yet Working.</br>
 <input type="checkbox" name="tc_debug" id="tc_debug"> send debug info to console<br>
 <hr>
-<button type="button" id="tc_close_config_cancel">Cancel</button>
-<button type="button" id="tc_close_config_save">Save</button>
+<button type="button" id="tc_config_help">Help</button>
+<button type="button" id="tc_close_config_cancel" style="float:right">Cancel</button>
+<button type="button" id="tc_close_config_save" style="float:right">Save</button>
+</div>
+
+<!-- Configuration Help -->
+<div id="config_help" class="settings popup" style="display:none; background-color:#777; max-width:800px; position: absolute; bottom:15px; right: 15px; top: auto; left: auto;">
+<p>
+This automation script is designed to help automate and optimise some basic actions.
+<p>
+Some of the check boxes etc. have tooltips if hovered over. Some additional notes:
+<p>
+"Buy gems, sell herbs etc." should be safe to be enabled all the time. The only major downside currently is it will Sublimate Lore when it is able to do so - this can be a problem at the beginning when it takes longer to produce codices. Sublimate may be split off into its own config option at some point.
+<p>
+"Click actions which make gold" will use stamina. This means that resting may never stop until gold is maxed, which will make adventuring somewhat tedious, so disable it while adventuring.
+<p>
+"Click focus while learning skills" will use mana. The same comment about resting above applies.
+<p>
+The advanced feature "try to learn faster in skills tab" will alternate between using focus and rest to hopefully maximise the speed at which skills are learnt. If a skill is chosen then that skill will be maxed, then the automation will switch between the remaining unlocked skills learning the lowest-levelled skill until everything is maxed. If no skill is being learnt when entering the skills tab, the automation will go straight to cycling through the skills.
+<hr>
+<button type="button" id="tc_help_close" style="float:right">Close</button>
 </div> `;
 
 	dummy.innerHTML = html;
@@ -905,7 +960,22 @@ Advanced features:<br>
 	// Can't do this directly in the HTML above because the GreaseMonkey functions exist in a different namespace
 	document.getElementById("tc_close_config_cancel").addEventListener("click", tc_close_config_cancel);
 	document.getElementById("tc_close_config_save").addEventListener("click", tc_close_config_save);
+	document.getElementById("tc_config_help").addEventListener("click", tc_config_help);
+	document.getElementById("tc_help_close").addEventListener("click", tc_help_close);
 	if (tc_debug) console.log("Config button added");
+}
+
+function tc_configure_for_version()
+{
+	tc_arcanum_ver = parseInt(document.querySelectorAll(".link-bar .vers")[0].innerHTML.split(' ')[1]);
+	// 323 for current lemur site, 890+ on Kong
+
+	// The default values should always be for the latest version, adjust them here if working with an old version.
+	if (tc_arcanum_ver <= 323) {
+		tc_gems["nature gem"] = "imbue lifegem";
+		tc_gems["earth gem"] = "imbue stone";
+		tc_gems["blood gem"] = "coagulate gem";
+	}
 }
 
 
@@ -939,7 +1009,7 @@ function tc_start_timers()	// can be restarted by save_settings()
 		tc_autoadv();
 		tc_sellsetup();
 		tc_advsetup();
-		tc_autoadvise();
+		tc_autoearngold();
 	}, tc_auto_speed);
 
 	tc_timer_autocast = window.setInterval(function() {
@@ -961,6 +1031,10 @@ var tc_load_timer = window.setInterval(function() {
 	console.log("Document loaded after " + tc_load_count*100 + " ms");
 
 	// Do this before we start any timers - loads timer values etc. from local storage.
+
+	// get Arcanum version and config some vars accordingly.
+	// Need to do this first in case it affects config setup.
+	tc_configure_for_version();
 	tc_config_setup();
 	tc_load_settings();
 
