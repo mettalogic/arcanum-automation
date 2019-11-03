@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         aardvark arcanum auto
-// @version      0.58
-// @author       aardvark
+// @version      0.59
+// @author       aardvark, Linspatz
 // @description  Automates casting buffs, buying gems making types gems, making lore. Adds sell junk/dupe item buttons. Must open the main tab and the spells tab once to work.
 // @downloadURL  https://github.com/mettalogic/arcanum-automation/raw/master/automate.user.js
 // @match        http://www.lerpinglemur.com/arcanum/
@@ -105,6 +105,7 @@ var tc_actions_gold = {
 	"advise notables" : 0.3,	// 4.5  (0.35 + .1 + .1 + .3 + .5) / .3  - after 1500 turns
 	"do chores" : 0.17,			// 2.94 (0.3 + .1 + .1) / 0.17 - after 250 turns
 	"clean stables" : 0.08,		// 2.5  (0.2 / 0.08)
+	"gather herbs" : 0.3,		// 1.33  (2 / 0.3*5) - assumes we are auto-selling surplus herbs
 };
 
 // Call this every second - will automatically pick up new spells
@@ -132,8 +133,11 @@ function tc_populate_spells()
 		if (qs.childElementCount == 3) {
 			var spell = qs.children[1].innerHTML.toLowerCase();
 			if (!tc_spells.get(spell) && !qs.children[2].firstChild.disabled) {
-				tc_spells.set(spell, qs.children[2].firstChild);
-				if (tc_debug) console.log("Saved spell: " + spell);
+				// Don't save spells we haven't learnt yet.
+				if (qs.children[2].firstChild.innerText.toLowerCase() == "cast") {
+					tc_spells.set(spell, qs.children[2].firstChild);
+					if (tc_debug) console.log("Saved spell: " + spell);
+				}
 			}
 		}
 	}
@@ -297,7 +301,6 @@ function tc_cast_spell(spell)
 {
 	var spl = tc_spells.get(spell);
 	if (!spl) return false;
-	if (!spl.innerText.toLowerCase() == "cast") return false;//Checks if spell is learnt.
 
 	if (spl.disabled) {	// not sure how this happens, but seems to prevent action ever being called again
 		if (tc_debug) console.log("Spell '" + spell + "' was disabled - deleting it");
@@ -712,7 +715,10 @@ function tc_autofocus()
 
 	// Linspatz's triple rest action + save mana for tomes modification.
 	// - except can't triple rest and learn tomes at the same time ...
-	var min = max < 11 ? max-1 : 10;
+	// Even after just a couple of mana spells, we can recover more than 1 mana in a normal timeslice so try 3 here:
+	// if we max mana before finishing resting we're wasting focus opportunity.
+	// Maybe best instead to just keep 1.5 mana for the 3 mana spells.
+	var min = max < 11 ? max-3 : 10;
 	if (amt >= min) {
 		tc_focus.disabled = false;	// button probably hasn't been updated yet, but we can cheat
 		for (let i = 10 * (amt-min); i > 0; i--)
