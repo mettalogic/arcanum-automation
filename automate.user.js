@@ -203,7 +203,7 @@ function tc_populate_adventures()
 	if (tc_gettab() !== "adventure") return;
 
 	//Map is set up as: name, [progress, needed, button]
-	for (let qs of document.querySelectorAll("div.game-main div.locales div.dungeon")){
+	for (let qs of document.querySelectorAll("div.game-main div.locales div.locale")){
 		if(!qs.children[0].children[0].children[1].disabled){
 			var name = qs.children[0].children[0].children[0].innerText // name of dungeon
 			var vals = qs.children[1].innerText.split("/")
@@ -583,7 +583,7 @@ function tc_advsetup()
 	}
 
 	// Creates an auto button for every adventure.
-	for (let qs of document.querySelectorAll("div.game-mid div.adventure div.locales div.dungeon span.separate:first-child")){
+	for (let qs of document.querySelectorAll("div.game-mid div.adventure div.locales div.locale span.separate:first-child")){
 		if (qs.lastElementChild.innerText !== "Auto"){
 			var seldungeon = document.createElement("button");
 			seldungeon.appendChild(document.createTextNode("Auto"));
