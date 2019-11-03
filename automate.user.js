@@ -235,7 +235,7 @@ function tc_check_bars(bars,percent) {
 // Check if you are in an adventure
 function tc_check_running_adv(){
 	for (let qs of tc_running.keys()) {
-		if (qs.split(/⚔|🎃|🌳/).length==2) return true;
+		if (qs.split(/⚔|🎃|🌳|📖/).length==2) return true;
 	}
 	return false;
 }
