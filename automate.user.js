@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         aardvark arcanum auto
-// @version      0.59
+// @version      0.60
 // @author       aardvark, Linspatz
 // @description  Automates casting buffs, buying gems making types gems, making lore. Adds sell junk/dupe item buttons. Must open the main tab and the spells tab once to work.
 // @downloadURL  https://github.com/mettalogic/arcanum-automation/raw/master/automate.user.js
@@ -23,7 +23,6 @@ var tc_auto_earn_gold = false;
 var tc_auto_heal = true;
 var tc_auto_adv = true;
 var tc_auto_focus_aggressive = false;
-var tc_auto_focus_lowest = false;
 
 // Set to a adventure name to continously run that adventure, leave blank to disable
 var tc_auto_adventure = "";
@@ -631,10 +630,12 @@ function tc_autoearngold()
 var tc_skill_saved = "";
 var tc_skill_last = "";
 
-/* One runner should always be resting and the other learning the skill. (If more than 2 runners could try multi-rest).
+/* This function is called when tc_auto_focus_aggressive is enabled and we have more than one runner.
+ One runner should always be resting and the other learning the skill. (If more than 2 runners could try multi-rest).
  If someone chooses a skill then stick with that until maxed, otherwise rotate amongst them choosing lowest level.
  How to tell if someone has specifically chosen a skill? Save current skill and next timeslice see if it's changed.
  This is different from single runner case where we always finish with rest, so there will be no skill chosen unless the user selected one.
+ If there are 3 runners available, we need to switch off the old skill when a new one becomes lowest.
 */
 function tc_autofocus_multi(amt)
 {
@@ -643,21 +644,13 @@ function tc_autofocus_multi(amt)
 	var lowest_btn;
 	var skill_btn;
 	var skill_to_learn = "";
+	var prev_btn;
+	var prev_skill = "";
 	for (let qs of document.querySelectorAll(".skills .skill")) {
 		var skill = qs.firstElementChild.firstElementChild.innerHTML;
 		var btn = qs.querySelectorAll("button")[0];
 		var text = btn.innerHTML.trim();	// Can be Unlock, Train, Stop
 		if (text == "Unlock" || btn.disabled) continue;
-
-		if (text == "Stop") {	// it means we're training this skill
-			if (skill != tc_skill_last || skill == tc_skill_saved) {
-				// the user changed to this skill or originally chose this one so learn it.
-				tc_skill_saved = skill_to_learn = skill;
-				skill_btn = btn;
-				if (tc_debug) console.log("Learning " + skill);
-				break;	// No need to look at anything else
-			}
-		}
 
 		// qs.firstElementChild.children[1].childNodes[0].data	- to get "Lvl: 3/4"
 		var lvl = parseInt(qs.firstElementChild.children[1].childNodes[0].data.substr(5).split('/')[0]);
@@ -665,6 +658,20 @@ function tc_autofocus_multi(amt)
 			lowest_lvl = lvl;
 			lowest_skill = skill;
 			lowest_btn = btn;
+		}
+
+		if (text == "Stop") {	// it means we're training this skill
+			if (skill != tc_skill_last || skill == tc_skill_saved) {
+				// the user changed to this skill or originally chose this one so learn it.
+				if (tc_debug) console.log("Learning " + skill + ", last = " + tc_skill_last + ", saved = " + tc_skill_saved);
+				tc_skill_saved = skill_to_learn = skill;
+				skill_btn = btn;
+			}
+			else if (skill == tc_skill_last) {
+				// If we don't end up learning this skill, we'll stop training it.
+				prev_btn = btn;
+				prev_skill = skill;
+			}
 		}
 	}
 
@@ -680,16 +687,20 @@ function tc_autofocus_multi(amt)
 	if (skill_btn.innerHTML.trim() == "Train")
 		skill_btn.click();
 	tc_skill_last = skill_to_learn;
+	if (prev_skill != "" && prev_skill != skill_to_learn) {
+		prev_btn.click();
+		if (tc_debug) console.log("Switch off " + prev_skill);
+	}
 
 	// We're not going to be doing anything else while focussing (apart from autocast spells),
 	// so just keep enough mana for the 3 mana spells.
 	if (amt > 2.0) {
-		tc_focus.disabled = false;	// button probably hasn't been updated yet, but we can cheat
+		tc_focus.disabled = false;	// in case button hasn't been updated yet
 		for (let i = 10 * (amt-2); i > 0; i--)	// 0.1 mana per focus
 			tc_focus.click();
 	}
 
-	tc_rest.disabled = false;
+	// if tc_runners > 2 could try clicking other sorts of rest as well
 	tc_rest.click();	// Has no effect if already resting.
 }
 
@@ -734,7 +745,7 @@ function tc_autofocus()
 
 	// If there are multiple runners available, the optimum strategy will be to have (at least) one resting continously,
 	// while the other one learns.
-	var r = document.querySelectorAll(".running").length;
+	var r = document.querySelectorAll(".running div button").length;
 	if (r > tc_runners) tc_runners = r;
 	if (tc_runners > 1) {	// don't want to mess up the working single runner code
 		tc_autofocus_multi(amt)	// available mana
@@ -847,7 +858,6 @@ function tc_load_settings()
 	tc_adventure_wait = get_val("tc_adventure_wait", 30, "int");	// needs to be below tc_auto_speed
 	tc_adventure_wait_cd = tc_adventure_wait;	//sets current cooldown to same time as wait period.
 	tc_auto_focus_aggressive = get_val("tc_auto_focus_aggressive", false, "bool");
-	tc_auto_focus_lowest = get_val("tc_auto_focus_lowest", false, "bool");
 	tc_debug = get_val("tc_debug", false, "bool");
 
 	document.getElementById("tc_suspend").checked = !tc_suspend;	// this one's backwards
@@ -861,7 +871,6 @@ function tc_load_settings()
 	document.getElementById("tc_auto_adv").checked = tc_auto_adv;
 	document.getElementById("tc_adventure_wait").value = (tc_adventure_wait / 1000 * tc_auto_speed);
 	document.getElementById("tc_auto_focus_aggressive").checked = tc_auto_focus_aggressive;
-	document.getElementById("tc_auto_focus_lowest").checked = tc_auto_focus_lowest;
 	document.getElementById("tc_debug").checked = tc_debug;
 }
 
@@ -879,7 +888,6 @@ function tc_save_settings()
 	tc_adventure_wait = (parseInt(document.getElementById("tc_adventure_wait").value) * 1000 / tc_auto_speed );
 	tc_adventure_wait_cd = tc_adventure_wait; 	//sets current cooldown to same time as wait period.
 	tc_auto_focus_aggressive = document.getElementById("tc_auto_focus_aggressive").checked;
-	tc_auto_focus_lowest = document.getElementById("tc_auto_focus_lowest").checked;
 	tc_debug = document.getElementById("tc_debug").checked;
 
 	localStorage.setItem("tc_suspend", tc_suspend);
@@ -893,7 +901,6 @@ function tc_save_settings()
 	localStorage.setItem("tc_auto_adv", tc_auto_adv);
 	localStorage.setItem("tc_adventure_wait", tc_adventure_wait);
 	localStorage.setItem("tc_auto_focus_aggressive", tc_auto_focus_aggressive);
-	localStorage.setItem("tc_auto_focus_lowest", tc_auto_focus_lowest);
 	localStorage.setItem("tc_debug", tc_debug);
 
 	// Now need to restart timers with new values
@@ -998,8 +1005,6 @@ function tc_config_setup()
 <hr>
 Advanced features:<br>
 <input type="checkbox" name="tc_auto_focus_aggressive" id="tc_auto_focus_aggressive" title="Only works while in skills. Attempts to alternate between rests and focus to maximise learning speed. Will switch to lowest level skill when current one is maxed. May have odd behaviour at times."> try to learn faster when in skills tab<br>
-
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<input type="checkbox" name="tc_auto_focus_lowest" id="tc_auto_focus_lowest" title ="always switch to level your lowest level skill instead of waiting for it to max out.">Not Yet Working.</br>
 <input type="checkbox" name="tc_debug" id="tc_debug"> send debug info to console<br>
 <hr>
 <button type="button" id="tc_config_help">Help</button>
@@ -1014,13 +1019,15 @@ This automation script is designed to help automate and optimise some basic acti
 <p>
 Some of the check boxes etc. have tooltips if hovered over. Some additional notes:
 <p>
+"Enable automation ..." if unchecked will stop all automation, except for the casting from the quickbar at the bottom of the screen. The quickbar has a white box on each button - type a time interval in seconds there, and the action will happen at that interval.
+<p>
 "Buy gems, sell herbs etc." should be safe to be enabled all the time. The only major downside currently is it will Sublimate Lore when it is able to do so - this can be a problem at the beginning when it takes longer to produce codices. Sublimate may be split off into its own config option at some point.
 <p>
 "Click actions which make gold" will use stamina. This means that resting may never stop until gold is maxed, which will make adventuring somewhat tedious, so disable it while adventuring.
 <p>
 "Click focus while learning skills" will use mana. The same comment about resting above applies.
 <p>
-The advanced feature "try to learn faster in skills tab" will alternate between using focus and rest to hopefully maximise the speed at which skills are learnt. If a skill is chosen then that skill will be maxed, then the automation will switch between the remaining unlocked skills learning the lowest-levelled skill until everything is maxed. If no skill is being learnt when entering the skills tab, the automation will go straight to cycling through the skills.
+The advanced feature "try to learn faster in skills tab" will alternate between using focus and rest to hopefully maximise the speed at which skills are learnt. If a skill is chosen then that skill will be maxed, then the automation will switch between the remaining unlocked skills, learning the lowest-levelled skill until everything is maxed. If no skill is being learnt when entering the skills tab, the automation will go straight to cycling through the skills. If multiple runners are unlocked, it should still work, but there is no advantage in trying to learn two skills at the same time, as only one will get focus. If the automation seems to get stuck on one skill, switch to another tab and stop learning the skill, then switch back to Skills.
 <hr>
 <button type="button" id="tc_help_close" style="float:right">Close</button>
 </div> `;
