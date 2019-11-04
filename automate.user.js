@@ -61,6 +61,7 @@ var tc_focus;
 var tc_rest;
 var tc_checked_spells = 0;	// have a look at the spell tab on startup
 var tc_time_offset = 0;	// used for casting spells - this will incr. every second
+var tc_runners = 1;		// how many runners are unlocked (based on what's seen, so will be a minimum)
 
 // List of Gems that needs to be updated manually if changed.
 var tc_gems = {
@@ -628,6 +629,69 @@ function tc_autoearngold()
 }
 
 var tc_skill_saved = "";
+var tc_skill_last = "";
+
+/* One runner should always be resting and the other learning the skill. (If more than 2 runners could try multi-rest).
+ If someone chooses a skill then stick with that until maxed, otherwise rotate amongst them choosing lowest level.
+ How to tell if someone has specifically chosen a skill? Save current skill and next timeslice see if it's changed.
+ This is different from single runner case where we always finish with rest, so there will be no skill chosen unless the user selected one.
+*/
+function tc_autofocus_multi(amt)
+{
+	var lowest_lvl = 1000;
+	var lowest_skill = "";
+	var lowest_btn;
+	var skill_btn;
+	var skill_to_learn = "";
+	for (let qs of document.querySelectorAll(".skills .skill")) {
+		var skill = qs.firstElementChild.firstElementChild.innerHTML;
+		var btn = qs.querySelectorAll("button")[0];
+		var text = btn.innerHTML.trim();	// Can be Unlock, Train, Stop
+		if (text == "Unlock" || btn.disabled) continue;
+
+		if (text == "Stop") {	// it means we're training this skill
+			if (skill != tc_skill_last || skill == tc_skill_saved) {
+				// the user changed to this skill or originally chose this one so learn it.
+				tc_skill_saved = skill_to_learn = skill;
+				skill_btn = btn;
+				if (tc_debug) console.log("Learning " + skill);
+				break;	// No need to look at anything else
+			}
+		}
+
+		// qs.firstElementChild.children[1].childNodes[0].data	- to get "Lvl: 3/4"
+		var lvl = parseInt(qs.firstElementChild.children[1].childNodes[0].data.substr(5).split('/')[0]);
+		if (lvl < lowest_lvl) {
+			lowest_lvl = lvl;
+			lowest_skill = skill;
+			lowest_btn = btn;
+		}
+	}
+
+	if (skill_to_learn == "") {
+		if (lowest_skill == "")	// nothing available to learn
+			return;
+
+		skill_to_learn = lowest_skill;
+		skill_btn = lowest_btn;
+		if (tc_debug) console.log("Learn lowest skill: " + skill_to_learn);
+	}
+
+	if (skill_btn.innerHTML.trim() == "Train")
+		skill_btn.click();
+	tc_skill_last = skill_to_learn;
+
+	// We're not going to be doing anything else while focussing (apart from autocast spells),
+	// so just keep enough mana for the 3 mana spells.
+	if (amt > 2.0) {
+		tc_focus.disabled = false;	// button probably hasn't been updated yet, but we can cheat
+		for (let i = 10 * (amt-2); i > 0; i--)	// 0.1 mana per focus
+			tc_focus.click();
+	}
+
+	tc_rest.disabled = false;
+	tc_rest.click();	// Has no effect if already resting.
+}
 
 // Uses focus until you have only 10 mana left.
 function tc_autofocus()
@@ -648,7 +712,7 @@ function tc_autofocus()
 	var max = tc_bars.get("mana")[1];
 
 	if (tc_gettab() != "skills" || !tc_auto_focus_aggressive) {
-		tc_skill_saved = "";
+		tc_skill_saved = tc_skill_last = "";
 
 		// 10 mana required for compile tome
 		var min = max < 11 ? max-1 : 10;
@@ -667,6 +731,16 @@ function tc_autofocus()
 	// Otherwise if we have a saved skill which isn't maxed, choose that,
 	// Otherwise learn cheapest skill (only checks level, not learning rate)
 	// Most useful at start of game, probably won't work well when multiple runners are unlocked.
+
+	// If there are multiple runners available, the optimum strategy will be to have (at least) one resting continously,
+	// while the other one learns.
+	var r = document.querySelectorAll(".running").length;
+	if (r > tc_runners) tc_runners = r;
+	if (tc_runners > 1) {	// don't want to mess up the working single runner code
+		tc_autofocus_multi(amt)	// available mana
+		return;
+	}
+1
 	var lowest_lvl = 1000;
 	var lowest_skill = "";
 	var lowest_btn;
@@ -713,20 +787,14 @@ function tc_autofocus()
 	if (skill_btn.innerHTML.trim() == "Train")
 		skill_btn.click();
 
-	// Linspatz's triple rest action + save mana for tomes modification.
-	// - except can't triple rest and learn tomes at the same time ...
-	// Even after just a couple of mana spells, we can recover more than 1 mana in a normal timeslice so try 3 here:
-	// if we max mana before finishing resting we're wasting focus opportunity.
-	// Maybe best instead to just keep 1.5 mana for the 3 mana spells.
-	var min = max < 11 ? max-3 : 10;
-	if (amt >= min) {
+	// We're not going to be doing anything else while focussing (apart from autocast spells),
+	// so just keep enough mana for the 3 mana spells.
+	if (amt > 2.0) {
 		tc_focus.disabled = false;	// button probably hasn't been updated yet, but we can cheat
-		for (let i = 10 * (amt-min); i > 0; i--)
+		for (let i = 10 * (amt-2); i > 0; i--)	// 0.1 mana per focus
 			tc_focus.click();
 	}
 
-//	tc_click_action("chant");
-//	tc_click_action("commune");
 	tc_rest.disabled = false;
 	tc_rest.click();
 }
@@ -918,7 +986,7 @@ function tc_config_setup()
 <div id="config_options" class="settings popup" style="display:none; background-color:#777; max-width:800px; position: absolute; bottom:15px; right: 15px; top: auto; left: auto;">
 <input type="checkbox" name="tc_suspend" id="tc_suspend" title="If unchecked, all automation is suspended. If checked, items enabled below will be run."> enable automation of items below<br><br>
 <input type="checkbox" name="tc_auto_misc" id="tc_auto_misc"> buy gems, sell herbs, scribe scrolls etc.<br>
-<input type="checkbox" name="tc_auto_earn_gold" id="tc_auto_earn_gold" title="Clicks one-off tasks like \"do chores\" or \"advise notables\" when you have enough stamina and you are in need of gold. "> click actions which make gold when gold is low<br>
+<input type="checkbox" name="tc_auto_earn_gold" id="tc_auto_earn_gold" title="Clicks one-off tasks like 'do chores' or 'advise notables' when you have enough stamina and you are in need of gold. "> click actions which make gold when gold is low<br>
 <input type="checkbox" name="tc_auto_focus" id="tc_auto_focus"> click focus while learning skills<br>
 <input type="checkbox" name="tc_auto_cast" id="tc_auto_cast" title="e.g. mana, fount"> cast common buff spells<br>
 <input type="checkbox" name="tc_auto_heal" id="tc_auto_heal"> cast healing spells in combat<br><br>
