@@ -397,8 +397,10 @@ function tc_automate()
 	if (tc_check_resource("codices",1)) {
 		if (tc_click_action("sublimate lore"))
 			for (let qs of document.querySelectorAll(".popup"))
-				if (qs.firstElementChild.innerHTML == "sublimate lore")
-					qs.children[3].firstElementChild.click();
+				if (qs.children[0].children[0].innerHTML == "sublimate lore")
+                    qs.children[1].children[0].click();
+//				if (qs.firstElementChild.innerHTML == "sublimate lore")
+//					qs.children[3].firstElementChild.click();
 	}
 }
 
