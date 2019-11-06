@@ -114,17 +114,11 @@ function tc_populate_spells()
 	// It can be confusing that autocast doesn't do anything until the spells tab is visited,
 	// so switch to it on startup and grab anything there.
 	if (tc_checked_spells == 0) {
-		tc_settab("spells");	// this might fail if spells not available yet
+		if (!tc_settab("spells"))	// this might fail if spells not available yet
+			tc_checked_spells++;
 		tc_checked_spells++;
 		// wait for tab to be displayed
 		return;
-	}
-	else if (tc_checked_spells == 1) {
-		if (tc_gettab() !== "spells") {
-			// switch tab failed - we don't have a spellbook yet
-			tc_checked_spells++;
-			return;
-		}
 	}
 
 	if (tc_gettab() !== "spells") return;
@@ -250,15 +244,16 @@ function tc_gettab()
 	}
 }
 
-// Set current tab to "name"
+// Set current tab to "name", return false if no such tab available.
 function tc_settab(newtab)
 {
 	for (let tab of document.querySelectorAll("div.menu-items div.menu-item span")) {
 		if (tab.innerHTML.indexOf(newtab) != -1) {
 			tab.click();
-			return;
+			return true;
 		}
 	}
+	return false;	// name not recognised, maybe not unlocked yet
 }
 
 // Clicks the selected adventure button
@@ -397,10 +392,9 @@ function tc_automate()
 	if (tc_check_resource("codices",1)) {
 		if (tc_click_action("sublimate lore"))
 			for (let qs of document.querySelectorAll(".popup"))
+				// will get some errors in console here as popup matches config screen
 				if (qs.children[0].children[0].innerHTML == "sublimate lore")
                     qs.children[1].children[0].click();
-//				if (qs.firstElementChild.innerHTML == "sublimate lore")
-//					qs.children[3].firstElementChild.click();
 	}
 }
 
@@ -563,8 +557,6 @@ function tc_sellsetup()
 		filter.id = "lootfilter";
 		filter.width = "50";
 
-
-		sellall.parentNode.insertBefore(br, null);
 		sellall.parentNode.insertBefore(t3, null);
 		sellall.parentNode.insertBefore(filter, null);
 	}
@@ -833,6 +825,218 @@ function tc_autoheal()
 	}
 }
 
+var tc_menu_inv_state = 0;
+
+/* We need to switch tabs to get lists of equipment, but need to allow time for tab to populate,
+ so create a state machine, and do one action each tick.
+ */
+function tc_menu_inv()
+{
+
+	var materials = [ "", "silk ", "cotton ", "stone ", "leather ", "wood ", "bone ", "bronze ", "iron ", "steel ", "quicksteel ",  "ethereal ", "ebonwood ", "idrasil ", "mithril ", "adamant "];	// worst to best
+	var armors = {	// items ordered worst to best within groups
+		"back"   : [ "cape", "robe", "cloak", "wings" ],
+		"chest"  : [ "jerkin", "padded armor", "chainmail", "plate mail" ],
+		"feet"   : [ "boots" ],
+		"fingers": [ "loop", "band", "ring" ],
+		"hands"  : [ "gloves" ],
+		"head"   : [ "hat", "cap", "helm", "conical helm" ],
+		"neck"   : [ "collar", "necklace", "pendant", "amulet" ],
+		"shins"  : [ "greaves" ],
+		"waist"  : [ "sash", "belt", "girdle", "cincture" ]
+	};
+	var weapons = [ "club", "knife", "broomstick", "cane", "dagger", "staff", "axe", "mace", "shortsword", "spear", "battleaxe", "longsword", "warhammer" ];	// roughly worst to best
+
+	switch (tc_menu_inv_state) {
+	case 0: return;
+	case 1: 	// Switch to Equip
+		tc_settab("equip");
+		tc_menu_inv_state++;
+		break;
+	case 2: 	// Grab lists of equipment, inventory and switch to adventure
+		tc_menu_inv.equip = document.querySelectorAll(".inv-equip .equip tr");	// store in static var
+		tc_menu_inv.inv = document.querySelectorAll(".item-table tr");
+
+		// Build a map of item -> qty
+/*			for (let row of document.querySelectorAll(".adventure .raid-bottom .inv .item-table tr")) {
+			// table has 4 columns: name + 3 buttons: Equip, Take, Sell
+			if (row.children[3].children[0].innerText == "Sell") {
+				var item = row.children[0].innerText;
+				var qty = items.get(item);
+				items.set(item, qty ? qty+1 : 1);
+			}
+		} */
+		tc_settab("adventure");
+		tc_menu_inv_state++;
+		break;
+	case 3:		// Grab list of loot and populate inventory screen
+		var loots = document.querySelectorAll(".inv .item-table tr");
+		var equips = tc_menu_inv.equip;
+		var invs = tc_menu_inv.inv;
+
+		console.log("Loot items = " + loots.length + ", equip = " + equips.length + ", inv = " + invs.length);
+
+		// Can use document.querySelectorAll(".menu-content")[0].clientWidth and clientHeight to get size of area to use for display.
+		// Can also use getBoundingClientRect(). x y width height top left etc.  Not sure if this is useful.
+		var size = document.querySelectorAll(".menu.game-mid")[0].getBoundingClientRect();
+		var divstyle = document.getElementById("tc_inv_main").style;
+
+		divstyle.background = window.getComputedStyle(document.body, null).getPropertyValue('background-color');
+		divstyle.width = size.width + "px"
+		divstyle.height = size.height + "px"
+		divstyle.top = size.top + "px"
+		divstyle.left = size.left + "px"
+		divstyle.display = "block";
+
+		var html;
+
+		// Loot
+		html="";
+		var loot = new Map();
+		for (let row of loots) {
+			// table has 4 columns: name + 3 buttons: Equip, Take, Sell
+			var item = row.children[0].innerText;
+			var rows = loot.get(item);
+			if (!rows)
+				loot.set(item, [ row ] );
+			else {
+				rows.push(row);
+				loot.set(item, rows);
+			}
+
+			if (row.children[3].children[0].innerText == "Sell") {
+				html += item + "<br>";
+			}
+		}
+//		document.getElementById("tc_inv_loot").innerHTML = html;
+		console.log("Loot map items: " + loot.size);
+//		tc_loot = loot;	// remove
+
+		// Equip
+		// First generate empty tables for our loot.
+		html="";
+		for (let row of equips) {
+			// <tr data-v-4284ca61="" class="equip-slot"><td data-v-4284ca61="" class="slot-name">neck:</td> <td data-v-4284ca61="" class="slot-item"><div data-v-4284ca61=""><span data-v-4284ca61="" class="item-name">amulet</span> <button data-v-4284ca61="">Unequip</button></div><div data-v-4284ca61=""><span data-v-4284ca61="" class="item-name">bone necklace</span> <button data-v-4284ca61="">Unequip</button></div></td></tr>
+			var bodypart = row.children[0].innerText;
+			bodypart = bodypart.slice(0, -1);	// remove trailing ':'
+			html += "<span id='tc_inv_equip_" + bodypart + "'><b>" + bodypart + " : </b></span>";
+			html += "<br>";
+			if (bodypart == "left")
+				continue;	// don't separate left and right
+			else
+				html += "<table style='border:none' id='tc_inv_" + bodypart + "'></table>";
+		}
+		document.getElementById("tc_inv_equip").innerHTML = html;
+
+		// then populate loot into above tables
+		for (let row of equips) {
+			// <tr data-v-4284ca61="" class="equip-slot"><td data-v-4284ca61="" class="slot-name">neck:</td> <td data-v-4284ca61="" class="slot-item"><div data-v-4284ca61=""><span data-v-4284ca61="" class="item-name">amulet</span> <button data-v-4284ca61="">Unequip</button></div><div data-v-4284ca61=""><span data-v-4284ca61="" class="item-name">bone necklace</span> <button data-v-4284ca61="">Unequip</button></div></td></tr>
+			var bodypart = row.children[0].innerText;
+			bodypart = bodypart.slice(0, -1);	// remove trailing ':'
+			if (row.children[1].children.length > 0) {
+				var e = document.getElementById("tc_inv_equip_" + bodypart);
+				for (let i = 0; i < row.children[1].children.length; i++)
+//					html += ", " + row.children[1].children[i].children[0].innerText;
+					e.insertBefore(row.children[1].children[i], null);
+			}
+			if (bodypart == "left")
+				continue;	// don't separate left and right
+			else if (bodypart == "right") {
+				// do all weapons
+				var table = document.getElementById("tc_inv_" + bodypart);
+				for (let i = materials.length-1; i >= 0; i--) {
+					for (let j = weapons.length-1; j >= 0; j--) {
+						var name = materials[i] + weapons[j];
+						var item = loot.get(name);
+						if (item) {
+//							html += name + " x " + item.length + "<br>";
+							for (let k of item)
+								table.insertBefore(k, null);
+						}
+					}
+				}
+			}
+			else {
+				// armor
+				var table = document.getElementById("tc_inv_" + bodypart);
+				for (let i = materials.length-1; i >= 0; i--) {
+					var armor = armors[bodypart];
+					for (let j = armor.length-1; j >= 0; j--) {
+						var name = materials[i] + armor[j];
+						var item = loot.get(name);
+						if (item) {
+//							html += name + " x " + item.length + "<br>";
+							for (let k of item)
+								table.insertBefore(k, null);
+						}
+					}
+				}
+			}
+		}
+
+		// Inv - don't really do anything with this
+		html="";
+		html = "<b>Inventory:</b><br>";
+		for (let row of invs) {
+			html += row.children[0].innerText + "<br>";
+		}
+		document.getElementById("tc_inv_inv").innerHTML = html;
+
+		tc_menu_inv_state++;
+		break;
+	case 4:
+		// Sit back and wait for something to happen
+		break;
+	}
+}
+
+function tc_menu_inv_init()
+{
+	if (tc_debug) console.log("menu inventory entered");
+	tc_menu_inv_state = 1;
+
+//	tc_settab("adventure");
+}
+
+function tc_menu_inv_close()
+{
+	document.getElementById("tc_inv_main").style.display = "none";
+	if (tc_debug) console.log("menu inventory closed");
+	tc_menu_inv_state = 0;
+}
+
+// Dealing with inventory (zzz)
+function tc_inv_setup()
+{
+	// Create a menu item (tab) "Inventory".
+	var dummy = document.createElement('div');	// this div won't be included, only the HTML below
+	var html = `<div class="menu-item"><span id="tc_menu_inv"><u> inventory </u></span></div>`;
+	dummy.innerHTML = html;
+	document.querySelectorAll(".menu.game-mid .menu-items")[0].insertBefore(dummy, null);
+//	document.body.firstElementChild.appendChild(dummy);
+	document.getElementById("tc_menu_inv").addEventListener("click", tc_menu_inv_init);
+
+	// Create a placeholder to store inventory.
+	dummy = document.createElement('div');	// this div won't be included, only the HTML below
+	html = `
+<div id="tc_inv_main" class="menu-content" style="display:none">
+<span title="This page does not update automatically. To switch to another tab, press the Close button first. On exit, it looks like loot has disappeared, switch tabs to refresh the loot list. Suggest using Sell dupes before entering this screen."><b>Equipped items and Loot</b></span>
+<button type="button" id="tc_inv_close" style="float:right">Close</button><br>
+<hr>
+<div id="tc_inv_equip"></div>
+<hr>
+<div id="tc_inv_inv"></div>
+<hr>
+<div id="tc_inv_loot"></div>
+</div> `;
+	dummy.innerHTML = html;
+	document.querySelectorAll(".menu.game-mid")[0].insertBefore(dummy, null);
+	document.getElementById("tc_inv_close").addEventListener("click", tc_menu_inv_close);
+
+	if (tc_debug) console.log("Inventory tab added");
+}
+
+
 // Functions to load and save settings from local storage and display configuration dialog.
 
 function tc_load_settings()
@@ -1093,6 +1297,7 @@ function tc_start_timers()	// can be restarted by save_settings()
 		tc_sellsetup();
 		tc_advsetup();
 		tc_autoearngold();
+		tc_menu_inv();	// handle populating Inventory tab
 	}, tc_auto_speed);
 
 	tc_timer_autocast = window.setInterval(function() {
@@ -1120,6 +1325,7 @@ var tc_load_timer = window.setInterval(function() {
 	tc_configure_for_version();
 	tc_config_setup();
 	tc_load_settings();
+	tc_inv_setup();
 
 	tc_start_timers();
 
