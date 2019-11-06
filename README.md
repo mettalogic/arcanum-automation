@@ -9,12 +9,15 @@ http://www.lerpinglemur.com/arcanum/
 Tasks automated include:
 - Making/purchasing scrolls, codices, gems when gold/research is full
 - Selling herbs when full
+- Sublimate lore when codices full
 - Regularly casting spell buffs which have been learnt
 - Adding an option on the quickbar to specify a time - buttons will be clicked every time interval
 - Adding a filter function and additional sell buttons for equipment while adventuring
 - Actively clicking focus while learning a skill
+- Optional automatic re-running of adventures
+- Add an Inventory "tab" that merges equipment and loot (which is sorted), to allow easy equipping of best loot.
   
-Note: the script requires you to visit the "Spells" option to learn new spells.
+The link to this script is also on the wiki under "Automation and Scripting"
 
 Browser
 -------
