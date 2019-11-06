@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         aardvark arcanum auto
-// @version      0.70
+// @version      0.71
 // @author       aardvark, Linspatz
 // @description  Automates casting buffs, buying gems making types gems, making lore. Adds sell junk/dupe item buttons. Must open the main tab and the spells tab once to work.
 // @downloadURL  https://github.com/mettalogic/arcanum-automation/raw/master/automate.user.js
@@ -894,21 +894,24 @@ function tc_menu_inv()
 		html="";
 		var loot = new Map();
 		for (let row of loots) {
-			// table has 4 columns: name + 3 buttons: Equip, Take, Sell
+			// table has 4 columns: name + 3 buttons: Equip, Take, Sell, except for e.g. Nymie's Charm and Pumpkin Cider
 			var item = row.children[0].innerText;
-			var rows = loot.get(item);
-			if (!rows)
-				loot.set(item, [ row ] );
-			else {
-				rows.push(row);
-				loot.set(item, rows);
+			if (row.children.length == 4 && row.children[1].children[0].innerText == "Equip") {
+				var rows = loot.get(item);
+				if (!rows)
+					loot.set(item, [ row ] );
+				else {
+					rows.push(row);
+					loot.set(item, rows);
+				}
 			}
-
-			if (row.children[3].children[0].innerText == "Sell") {
+			else {
+				// Some sort of unusual item, add it to a list at the bottom
 				html += item + "<br>";
 			}
 		}
-//		document.getElementById("tc_inv_loot").innerHTML = html;
+		if (html != "")
+			document.getElementById("tc_inv_loot").innerHTML = "<b>Miscellaneous loot:</b><br>" + html;
 		console.log("Loot map items: " + loot.size);
 //		tc_loot = loot;	// remove
 
