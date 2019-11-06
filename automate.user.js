@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         aardvark arcanum auto
-// @version      0.71
+// @version      0.72
 // @author       aardvark, Linspatz
 // @description  Automates casting buffs, buying gems making types gems, making lore. Adds sell junk/dupe item buttons. Must open the main tab and the spells tab once to work.
 // @downloadURL  https://github.com/mettalogic/arcanum-automation/raw/master/automate.user.js
@@ -874,6 +874,7 @@ function tc_menu_inv()
 		var equips = tc_menu_inv.equip;
 		var invs = tc_menu_inv.inv;
 
+		// equip is always going to be 11 (as it's body slots, not items), so not actually much use
 		console.log("Loot items = " + loots.length + ", equip = " + equips.length + ", inv = " + invs.length);
 
 		// Can use document.querySelectorAll(".menu-content")[0].clientWidth and clientHeight to get size of area to use for display.
@@ -938,9 +939,10 @@ function tc_menu_inv()
 			bodypart = bodypart.slice(0, -1);	// remove trailing ':'
 			if (row.children[1].children.length > 0) {
 				var e = document.getElementById("tc_inv_equip_" + bodypart);
-				for (let i = 0; i < row.children[1].children.length; i++)
+				while (row.children[1].children.length > 0) {
 //					html += ", " + row.children[1].children[i].children[0].innerText;
-					e.insertBefore(row.children[1].children[i], null);
+					e.insertBefore(row.children[1].children[0], null);	// this actually moves (rather than copies) the child out of row
+				}
 			}
 			if (bodypart == "left")
 				continue;	// don't separate left and right
@@ -1024,7 +1026,7 @@ function tc_inv_setup()
 	html = `
 <div id="tc_inv_main" class="menu-content" style="display:none">
 <span title="This page does not update automatically. To switch to another tab, press the Close button first. On exit, it looks like loot has disappeared, switch tabs to refresh the loot list. Suggest using Sell dupes before entering this screen."><b>Equipped items and Loot</b></span>
-<button type="button" id="tc_inv_close" style="float:right">Close</button><br>
+<button type="button" id="tc_inv_close" style="float:right; position:sticky; top:5px">Close</button><br>
 <hr>
 <div id="tc_inv_equip"></div>
 <hr>
