@@ -20,7 +20,7 @@ var tc_auto_misc = true;
 var jsm_auto_gather = true;
 var jsm_auto_grind = true;
 var tc_auto_cast = true;
-var jsm_jsm_skipcast = true;
+var jsm_skipcast = true;
 var tc_auto_focus = true;
 var tc_auto_earn_gold = false;
 var tc_auto_heal = true;
@@ -336,7 +336,7 @@ function iko_autocast()
 	}
 }
 
-//Function to check spell exclussion rules
+//Function to check spell exclusion rules
 function skipcast(spell)
 {
 	//Add sanity checks to some autocasting spells
@@ -355,7 +355,7 @@ function skipcast(spell)
 	//No need for unseen servant if gold is full
 	if (spell == "unseen servant" && tc_check_resource("gold",1)) return true;
   
-	//No exclussion triggered, return false
+	//No exclusion triggered, return false
 	return false;
 }
 
