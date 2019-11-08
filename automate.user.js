@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         aardvark arcanum auto
-// @version      0.72
+// @version      0.73
 // @author       aardvark, Linspatz
 // @description  Automates casting buffs, buying gems making types gems, making lore. Adds sell junk/dupe item buttons. Must open the main tab and the spells tab once to work.
 // @downloadURL  https://github.com/mettalogic/arcanum-automation/raw/master/automate.user.js
@@ -604,7 +604,7 @@ function tc_sellsetup()
 	if (tc_debug) console.log("Sell buttons added");
 }
 
-// Puts a button to set which dungeon to auto and pressing flee will cancle. Code based off of code by Bz
+// Puts a button to set which dungeon to auto and pressing flee will cancel. Code based off of code by Bz
 function tc_advsetup()
 {
 	if (tc_gettab() !== "adventure") return;
@@ -624,6 +624,8 @@ function tc_advsetup()
 			seldungeon.addEventListener("click", function(){
 				tc_auto_adventure = qs.firstElementChild.firstElementChild.innerText;
 				tc_click_adv(tc_auto_adventure)});
+			if (tc_auto_adventure == qs.child[0].child[0].innerText)
+				seldungeon.setAttribute("style", "color:#1B5E20");
 			qs.appendChild(seldungeon);
 		}
 	}
