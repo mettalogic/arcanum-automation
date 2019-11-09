@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         aardvark arcanum auto
-// @version      0.73
+// @version      0.74
 // @author       aardvark, Linspatz
 // @description  Automates casting buffs, buying gems making types gems, making lore. Adds sell junk/dupe item buttons. Must open the main tab and the spells tab once to work.
 // @downloadURL  https://github.com/mettalogic/arcanum-automation/raw/master/automate.user.js
@@ -17,10 +17,11 @@ var tc_suspend = false;		// set this to true in console to suspend all auto func
 
 // Setting to false will stop individual actions
 var tc_auto_misc = true;
-var jsm_auto_gather = true;
-var jsm_auto_grind = true;
+var tc_use_sublimate = true;
+var tc_auto_gather = true;
+var tc_auto_grind = true;
 var tc_auto_cast = true;
-var jsm_skipcast = true;
+var tc_skipcast = true;
 var tc_auto_focus = true;
 var tc_auto_earn_gold = false;
 var tc_auto_heal = true;
@@ -337,7 +338,7 @@ function iko_autocast()
 }
 
 //Function to check spell exclusion rules
-function skipcast(spell)
+function tc_skip_cast(spell)
 {
 	//Add sanity checks to some autocasting spells
 	//No heals at full health
@@ -367,7 +368,7 @@ function tc_autocast()
 
 	for (var spell in tc_autospells) {
 		var rpt = tc_autospells[spell];
-		if (tc_time_offset % rpt == 0 && !(jsm_skipcast && skipcast(spell))) {
+		if (tc_time_offset % rpt == 0 && !(tc_skipcast && tc_skip_cast(spell))) {
 			if (tc_debug) console.log("try casting " + spell);
 			tc_cast_spell(spell);
 		}
@@ -419,7 +420,7 @@ function tc_automate()
 	}
 
 	// Sublimate lore
-	if (tc_check_resource("codices",1)) {
+	if (tc_use_sublimate && tc_check_resource("codices",1)) {
 		if (tc_click_action("sublimate lore"))
 			for (let qs of document.querySelectorAll(".popup"))
 				// will get some errors in console here as popup matches config screen
@@ -428,12 +429,12 @@ function tc_automate()
 	}
 
 	//Gather herbs if stamina full and herbs are not
-	if (jsm_auto_gather && tc_check_bars("stamina",1) && !tc_check_resource("herbs",1))
+	if (tc_auto_gather && tc_check_bars("stamina",1) && !tc_check_resource("herbs",1))
 		for (let i=0; i < 10; ++i)
 			tc_click_action("gather herbs");
   
 	//Grind out some max reserach if max mana
-	if (jsm_auto_grind && tc_check_bars("mana",1))
+	if (tc_auto_grind && tc_check_bars("mana",1))
 		for (let i=0; i < 20; ++i)
 			tc_click_action("grind");
 }
@@ -1101,12 +1102,13 @@ function tc_load_settings()
 	// Set default values here to be "noob-friendly"
 	tc_suspend = get_val("tc_suspend", false, "bool");
 	tc_auto_cast = get_val("tc_auto_cast", true, "bool");
-	jsm_skipcast = get_val("jsm_skipcast", true, "bool");
+	tc_skipcast = get_val("tc_skipcast", true, "bool");
 	tc_auto_focus = get_val("tc_auto_focus", true, "bool");
 	tc_auto_heal = get_val("tc_auto_heal", true, "bool");
 	tc_auto_misc = get_val("tc_auto_misc", true, "bool");
-	jsm_auto_gather = get_val("jsm_auto_gather", true, "bool");
-	jsm_auto_grind = get_val("jsm_auto_grind", true, "bool");
+	tc_use_sublimate = get_val("tc_use_sublimate", true, "bool");
+	tc_auto_gather = get_val("tc_auto_gather", true, "bool");
+	tc_auto_grind = get_val("tc_auto_grind", true, "bool");
 	tc_auto_speed = get_val("tc_auto_speed", 1000, "int");
 	tc_auto_speed_spells = get_val("tc_auto_speed_spells", 950, "int");
 	tc_auto_earn_gold = get_val("tc_auto_earn_gold", false, "bool");
@@ -1118,12 +1120,13 @@ function tc_load_settings()
 
 	document.getElementById("tc_suspend").checked = !tc_suspend;	// this one's backwards
 	document.getElementById("tc_auto_cast").checked = tc_auto_cast;
-	document.getElementById("jsm_skipcast").checked = jsm_skipcast;
+	document.getElementById("tc_skipcast").checked = tc_skipcast;
 	document.getElementById("tc_auto_focus").checked = tc_auto_focus;
 	document.getElementById("tc_auto_heal").checked = tc_auto_heal;
 	document.getElementById("tc_auto_misc").checked = tc_auto_misc;
-	document.getElementById("jsm_auto_gather").checked = jsm_auto_gather;
-	document.getElementById("jsm_auto_grind").checked = jsm_auto_grind;
+	document.getElementById("tc_use_sublimate").checked = tc_use_sublimate;
+	document.getElementById("tc_auto_gather").checked = tc_auto_gather;
+	document.getElementById("tc_auto_grind").checked = tc_auto_grind;
 	document.getElementById("tc_auto_speed").value = tc_auto_speed;
 	document.getElementById("tc_auto_speed_spells").value = tc_auto_speed_spells;
 	document.getElementById("tc_auto_earn_gold").checked = tc_auto_earn_gold;
@@ -1137,12 +1140,13 @@ function tc_save_settings()
 {
 	tc_suspend = !document.getElementById("tc_suspend").checked;	// this one's backwards
 	tc_auto_cast = document.getElementById("tc_auto_cast").checked;
-	jsm_skipcast = document.getElementById("jsm_skipcast").checked;
+	tc_skipcast = document.getElementById("tc_skipcast").checked;
 	tc_auto_focus = document.getElementById("tc_auto_focus").checked;
 	tc_auto_heal = document.getElementById("tc_auto_heal").checked;
 	tc_auto_misc = document.getElementById("tc_auto_misc").checked;
-	jsm_auto_gather = document.getElementById("jsm_auto_gather").checked;
-	jsm_auto_grind = document.getElementById("jsm_auto_grind").checked;
+	tc_use_sublimate = document.getElementById("tc_use_sublimate").checked;
+	tc_auto_gather = document.getElementById("tc_auto_gather").checked;
+	tc_auto_grind = document.getElementById("tc_auto_grind").checked;
 	tc_auto_speed = parseInt(document.getElementById("tc_auto_speed").value);
 	tc_auto_speed_spells = parseInt(document.getElementById("tc_auto_speed_spells").value);
 	tc_auto_earn_gold = document.getElementById("tc_auto_earn_gold").checked;
@@ -1154,12 +1158,13 @@ function tc_save_settings()
 
 	localStorage.setItem("tc_suspend", tc_suspend);
 	localStorage.setItem("tc_auto_cast", tc_auto_cast);
-	localStorage.setItem("jsm_skipcast", jsm_skipcast);
+	localStorage.setItem("tc_skipcast", tc_skipcast);
 	localStorage.setItem("tc_auto_focus", tc_auto_focus);
 	localStorage.setItem("tc_auto_heal", tc_auto_heal);
 	localStorage.setItem("tc_auto_misc", tc_auto_misc);
-	localStorage.setItem("jsm_auto_gather", jsm_auto_gather);
-	localStorage.setItem("jsm_auto_grind", jsm_auto_grind);
+	localStorage.setItem("tc_use_sublimate", tc_use_sublimate);
+	localStorage.setItem("tc_auto_gather", tc_auto_gather);
+	localStorage.setItem("tc_auto_grind", tc_auto_grind);
 	localStorage.setItem("tc_auto_speed", tc_auto_speed);
 	localStorage.setItem("tc_auto_speed_spells", tc_auto_speed_spells);
 	localStorage.setItem("tc_auto_earn_gold", tc_auto_earn_gold);
@@ -1258,12 +1263,13 @@ function tc_config_setup()
 <div id="config_options" class="settings popup" style="display:none; background-color:#777; max-width:800px; position: absolute; bottom:15px; right: 15px; top: auto; left: auto;">
 <input type="checkbox" name="tc_suspend" id="tc_suspend" title="If unchecked, all automation is suspended. If checked, items enabled below will be run."> enable automation of items below<br><br>
 <input type="checkbox" name="tc_auto_misc" id="tc_auto_misc"> buy gems, sell herbs, scribe scrolls etc.<br>
-<input type="checkbox" name="jsm_auto_gather" id="jsm_auto_gather"> gather herbs when stamina is full and herbs aren't (recommend minimum 2000ms auto interval)<br>
-<input type="checkbox" name="jsm_auto_grind" id="jsm_auto_grind"> use the grind action when mana is full (recommend minimum 2000ms auto interval)<br>
+<input type="checkbox" name="tc_use_sublimate" id="tc_use_sublimate"> activate sublimate lore when codices are full<br>
+<input type="checkbox" name="tc_auto_gather" id="tc_auto_gather"> gather herbs when stamina is full and herbs aren't (recommend minimum 2000ms auto interval)<br>
+<input type="checkbox" name="tc_auto_grind" id="tc_auto_grind"> use the grind action when mana is full (recommend minimum 2000ms auto interval)<br>
 <input type="checkbox" name="tc_auto_earn_gold" id="tc_auto_earn_gold" title="Clicks one-off tasks like 'do chores' or 'advise notables' when you have enough stamina and you are in need of gold. "> click actions which make gold when gold is low<br>
 <input type="checkbox" name="tc_auto_focus" id="tc_auto_focus"> click focus while learning skills<br>
 <input type="checkbox" name="tc_auto_cast" id="tc_auto_cast" title="e.g. mana, fount"> cast common buff spells<br>
-<input type="checkbox" name="jsm_skipcast" id="jsm_skipcast"> but don't cast buffs when not needed (eg. no wild growth when herbs are full)<br>
+<input type="checkbox" name="tc_skipcast" id="tc_skipcast"> but don't cast buffs when not needed (eg. no wild growth when herbs are full)<br>
 <input type="checkbox" name="tc_auto_heal" id="tc_auto_heal"> cast healing spells in combat<br><br>
 <input type="checkbox" name="tc_auto_adv" id="tc_auto_adv"> automatically reenter dungeons <br>
 <input type="text" name="tc_adventure_wait" id="tc_adventure_wait" width=10> number of seconds to wait before reentering an adventure<br>
