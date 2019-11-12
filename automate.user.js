@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         aardvark arcanum auto
-// @version      0.75
+// @version      0.76
 // @author       aardvark, Linspatz
 // @description  Automates casting buffs, buying gems making types gems, making lore. Adds sell junk/dupe item buttons. Must open the main tab and the spells tab once to work.
 // @downloadURL  https://github.com/mettalogic/arcanum-automation/raw/master/automate.user.js
@@ -468,7 +468,7 @@ function tc_autoadv()
 // Sells all items that are considered junk
 function tc_selljunk()
 {
-	var sell_exact = [ "amulet", "band", "belt", "boots", "broomstick", "cane", "cap", "cape", "cincture", "cloak", "club", "collar", "conical helm", "dagger", "girdle", "gloves", "greaves", "hat", "jerkin", "knife", "loop", "necklace", "pendant", "ring", "robe", "sash", "shortsword", "spear", "staff" ];
+	var sell_exact = [ "amulet", "axe", "band", "battleaxe", "belt", "boots", "broomstick", "cane", "cap", "cape", "cincture", "cloak", "club", "collar", "conical helm", "dagger", "girdle", "gloves", "greaves", "hat", "helm", "jerkin", "knife", "longsword", "loop", "mace", "necklace", "pendant", "ring", "robe", "sash", "shortsword", "spear", "staff" ];
 	var sell_match = [ "silk ", "cotton ", "stone ", "leather ", "^wood ", "bone ", "bronze ", "iron ", "^steel " ];	// aggressive
 
 	// "silk ", "cotton ", "stone ", "leather ", "^wood ", "bone ", "bronze ", "iron ", "^steel ", "quicksteel ", "mithril ", "ebonwood ", "ethereal ", "adamant "
@@ -918,7 +918,7 @@ function tc_menu_inv()
 		var invs = tc_menu_inv.inv;
 
 		// equip is always going to be 11 (as it's body slots, not items), so not actually much use
-		console.log("Loot items = " + loots.length + ", equip = " + equips.length + ", inv = " + invs.length);
+		if (tc_debbug) console.log("Loot items = " + loots.length + ", equip = " + equips.length + ", inv = " + invs.length);
 
 		// Can use document.querySelectorAll(".menu-content")[0].clientWidth and clientHeight to get size of area to use for display.
 		// Can also use getBoundingClientRect(). x y width height top left etc.  Not sure if this is useful.
@@ -956,7 +956,7 @@ function tc_menu_inv()
 		}
 		if (html != "")
 			document.getElementById("tc_inv_loot").innerHTML = "<b>Miscellaneous loot:</b><br>" + html;
-		console.log("Loot map items: " + loot.size);
+		if (tc_debug) console.log("Loot map items: " + loot.size);
 //		tc_loot = loot;	// remove
 
 		// Equip
