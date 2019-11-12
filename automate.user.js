@@ -625,7 +625,7 @@ function tc_advsetup()
 			seldungeon.addEventListener("click", function(){
 				tc_auto_adventure = qs.firstElementChild.firstElementChild.innerText;
 				tc_click_adv(tc_auto_adventure)});
-			if (tc_auto_adventure == qs.child[0].child[0].innerText)
+			if (tc_auto_adventure == qs.children[0].children[0].innerText)
 				seldungeon.setAttribute("style", "color:#1B5E20");
 			qs.appendChild(seldungeon);
 		}
