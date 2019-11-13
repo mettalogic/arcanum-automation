@@ -918,7 +918,7 @@ function tc_menu_inv()
 		var invs = tc_menu_inv.inv;
 
 		// equip is always going to be 11 (as it's body slots, not items), so not actually much use
-		if (tc_debbug) console.log("Loot items = " + loots.length + ", equip = " + equips.length + ", inv = " + invs.length);
+		if (tc_debug) console.log("Loot items = " + loots.length + ", equip = " + equips.length + ", inv = " + invs.length);
 
 		// Can use document.querySelectorAll(".menu-content")[0].clientWidth and clientHeight to get size of area to use for display.
 		// Can also use getBoundingClientRect(). x y width height top left etc.  Not sure if this is useful.
