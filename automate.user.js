@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         aardvark arcanum auto
-// @version      0.77
+// @version      0.78
 // @author       aardvark, Linspatz
 // @description  Automates casting buffs, buying gems making types gems, making lore. Adds sell junk/dupe item buttons. Must open the main tab and the spells tab once to work.
 // @downloadURL  https://github.com/mettalogic/arcanum-automation/raw/master/automate.user.js
@@ -868,6 +868,17 @@ function tc_autoheal()
 	}
 }
 
+//coloring potions in red :D
+function tc_colorpot(){
+    if (tc_gettab() !== "equip") return;
+    for (let item of document.querySelectorAll(".item-table .separate")){
+        if (item.children[1].children[0].innerHTML == "Use"){
+            item.children[0].style["background-color"] = "red";
+        }
+    }
+}
+
+
 var tc_menu_inv_state = 0;
 
 /* We need to switch tabs to get lists of equipment, but need to allow time for tab to populate,
@@ -1366,6 +1377,7 @@ function tc_start_timers()	// can be restarted by save_settings()
 		tc_advsetup();
 		tc_autoearngold();
 		tc_menu_inv();	// handle populating Inventory tab
+		tc_colorpot() // potion coloring
 	}, tc_auto_speed);
 
 	tc_timer_autocast = window.setInterval(function() {
