@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         aardvark arcanum auto
-// @version      0.76
+// @version      0.77
 // @author       aardvark, Linspatz
 // @description  Automates casting buffs, buying gems making types gems, making lore. Adds sell junk/dupe item buttons. Must open the main tab and the spells tab once to work.
 // @downloadURL  https://github.com/mettalogic/arcanum-automation/raw/master/automate.user.js
@@ -897,7 +897,7 @@ function tc_menu_inv()
 		tc_menu_inv_state++;
 		break;
 	case 2: 	// Grab lists of equipment, inventory and switch to adventure
-		tc_menu_inv.equip = document.querySelectorAll(".inv-equip .equip tr");	// store in static var
+		tc_menu_inv.equip = document.querySelectorAll(".inv-equip .equip .equip-slot");	// store in static var
 		tc_menu_inv.inv = document.querySelectorAll(".item-table tr");
 
 		// Build a map of item -> qty
@@ -1053,7 +1053,7 @@ function tc_menu_inv_close()
 	tc_menu_inv_state = 0;
 }
 
-// Dealing with inventory (zzz)
+// Dealing with inventory
 function tc_inv_setup()
 {
 	// Create a menu item (tab) "Inventory".
