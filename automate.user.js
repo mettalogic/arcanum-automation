@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         aardvark arcanum auto
-// @version      0.78
+// @version      0.79
 // @author       aardvark, Linspatz
 // @description  Automates casting buffs, buying gems making types gems, making lore. Adds sell junk/dupe item buttons. Must open the main tab and the spells tab once to work.
 // @downloadURL  https://github.com/mettalogic/arcanum-automation/raw/master/automate.user.js
@@ -1363,6 +1363,7 @@ function tc_start_timers()	// can be restarted by save_settings()
 		window.clearInterval(tc_timer_autocast);
 
 	tc_timer_ac = window.setInterval(function() {
+		tc_config_setup();
 		tc_populate_spells();
 		tc_populate_resources();
 		tc_populate_actions();
