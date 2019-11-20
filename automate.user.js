@@ -71,7 +71,7 @@ var tc_gems = {
 	"arcane gem" : "imbue gem (arcane)",
 	"fire gem" : "imbue gem (fire)",
 	"water gem" : "imbue gem (water)",
-	"nature gem" : "imbue lifegem (nature)",
+	"nature gem" : "imbue gem (nature)", //updated from lifegem to gem, v1086 change
 	"earth gem" : "imbue stone (earth)",
 	"air gem" : "imbue gem (air)",
 	"shadow gem" : "imbue gem (shadow)",
